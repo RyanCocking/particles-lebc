@@ -1,3 +1,6 @@
+# Particle experiencing shear force
+# Ryan Cocking 2023
+
 """
 Animation of Elastic collisions with Gravity
 
@@ -43,25 +46,6 @@ class ParticleBox:
         self.boundary_func = None
         self.shear_rate = shear_rate
         self.offset_x = 0
-
-    def boundary_elastic(self):
-        # check for crossing boundary
-        crossed_x1 = (self.state[:, 0] < self.bounds[0] + self.size)  # xmin
-        crossed_x2 = (self.state[:, 0] > self.bounds[1] - self.size)  # xmax
-        crossed_y1 = (self.state[:, 1] < self.bounds[2] + self.size)  # ymin
-        crossed_y2 = (self.state[:, 1] > self.bounds[3] - self.size)  # ymax
-
-        # prevents particles actually leaving the box by placing them just
-        # inside the boundary
-        self.state[crossed_x1, 0] = self.bounds[0] + self.size
-        self.state[crossed_x2, 0] = self.bounds[1] - self.size
-
-        self.state[crossed_y1, 1] = self.bounds[2] + self.size
-        self.state[crossed_y2, 1] = self.bounds[3] - self.size
-
-        # reverse velocity direction
-        self.state[crossed_x1 | crossed_x2, 2] *= -1
-        self.state[crossed_y1 | crossed_y2, 3] *= -1
 
     def boundary_pbc(self):
         # check for crossing boundary
@@ -164,8 +148,8 @@ if boundary_type == "lebc":
 else:
     box = ParticleBox(init_state, size=0.04)
 
+# NOTE: have pbc that automatically becomes lebc when shear force is nonzero
 boundary_dict = {
-    "elastic" : box.boundary_elastic,
     "pbc" : box.boundary_pbc,
     "lebc" : box.boundary_lebc
 }
@@ -301,4 +285,4 @@ ani = animation.FuncAnimation(fig, animate, frames=600,
 # plt.show()
 
 writervideo = animation.FFMpegWriter(fps=60)
-ani.save("/home/ryan/work/boundary/video.mp4", writer=writervideo)
+ani.save("out.mp4", writer=writervideo)
