@@ -33,16 +33,11 @@ class ParticleBox:
                                [-0.5, -0.5, -0.5, 0.5]],
                  bounds = [-1, 1, -1, 1],
                  size = 0.04,
-                 M = 0.05,
-                 G = 9.8,
                  shear_rate = 0):
         self.init_state = np.asarray(init_state, dtype=float)
-        self.M = M * np.ones(self.init_state.shape[0])
         self.size = size
         self.state = self.init_state.copy()
-        self.time_elapsed = 0
         self.bounds = bounds
-        self.G = G
         self.shear_rate = shear_rate
         self.offset_x = 0
 
@@ -92,7 +87,6 @@ class ParticleBox:
 
     def step(self, dt):
         """step once by dt seconds"""
-        self.time_elapsed += dt
 
         # update positions
         self.state[:, :2] += dt * self.state[:, 2:]
@@ -104,43 +98,13 @@ class ParticleBox:
         ind1 = ind1[unique]
         ind2 = ind2[unique]
 
-        # update velocities of colliding pairs
-        for i1, i2 in zip(ind1, ind2):
-            # mass
-            m1 = self.M[i1]
-            m2 = self.M[i2]
-
-            # location vector
-            r1 = self.state[i1, :2]
-            r2 = self.state[i2, :2]
-
-            # velocity vector
-            v1 = self.state[i1, 2:]
-            v2 = self.state[i2, 2:]
-
-            # relative location & velocity vectors
-            r_rel = r1 - r2
-            v_rel = v1 - v2
-
-            # momentum vector of the center of mass
-            v_cm = (m1 * v1 + m2 * v2) / (m1 + m2)
-
-            # collisions of spheres reflect v_rel over r_rel
-            rr_rel = np.dot(r_rel, r_rel)
-            vr_rel = np.dot(v_rel, r_rel)
-            v_rel = 2 * r_rel * vr_rel / rr_rel - v_rel
-
-            # assign new velocities
-            self.state[i1, 2:] = v_cm + v_rel * m2 / (m1 + m2)
-            self.state[i2, 2:] = v_cm - v_rel * m1 / (m1 + m2)
-
         self.boundary_func()
 
 
 #------------------------------------------------------------
 # set up initial state
 np.random.seed(2)
-Npart = 3
+Npart = 20
 init_state = -0.5 + np.random.random((Npart, 4))
 init_state[:, :2] *= 3.9
 dt = 1. / 30 # 30fps
