@@ -43,9 +43,13 @@ class ParticleBox:
         self.time_elapsed = 0
         self.bounds = bounds
         self.G = G
-        self.boundary_func = None
         self.shear_rate = shear_rate
         self.offset_x = 0
+
+        if abs(self.shear_rate) > 0:
+            self.boundary_func = self.boundary_lebc
+        else:
+            self.boundary_func = self.boundary_pbc
 
     def boundary_pbc(self):
         # check for crossing boundary
@@ -140,20 +144,11 @@ Npart = 3
 init_state = -0.5 + np.random.random((Npart, 4))
 init_state[:, :2] *= 3.9
 dt = 1. / 30 # 30fps
-boundary_type = "lebc"
 
-if boundary_type == "lebc":
-    box = ParticleBox(init_state, size=0.04, shear_rate=10.0)
-    box.set_lebc_offset(dt)
-else:
-    box = ParticleBox(init_state, size=0.04)
-
-# NOTE: have pbc that automatically becomes lebc when shear force is nonzero
-boundary_dict = {
-    "pbc" : box.boundary_pbc,
-    "lebc" : box.boundary_lebc
-}
-box.boundary_func = boundary_dict[boundary_type]
+box = ParticleBox(init_state, size=0.04, shear_rate=0.0)
+box.set_lebc_offset(dt)
+# else:
+#     box = ParticleBox(init_state, size=0.04)
 
 #------------------------------------------------------------
 # set up figure and animation
@@ -282,7 +277,7 @@ ani = animation.FuncAnimation(fig, animate, frames=600,
 # http://matplotlib.sourceforge.net/api/animation_api.html
 # ani.save('particle_box.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
 
-# plt.show()
+plt.show()
 
-writervideo = animation.FFMpegWriter(fps=60)
-ani.save("out.mp4", writer=writervideo)
+# writervideo = animation.FFMpegWriter(fps=60)
+# ani.save("out.mp4", writer=writervideo)
