@@ -80,10 +80,6 @@ class ParticleBox:
         while self.offset_x > L_y:
             n += 1
             self.offset_x = self.shear_rate * dt * L_y - n * L_y
-        print(f"LEBC: n =        {n}")
-        print(f"      shear =    {self.shear_rate * dt}")
-        print(f"      L_y =      {L_y}")
-        print(f"      offset_x = {self.offset_x}")
 
     def step(self, dt):
         """step once by dt seconds"""
@@ -91,12 +87,18 @@ class ParticleBox:
         # update positions
         self.state[:, :2] += dt * self.state[:, 2:]
 
+        # TODO position update in context of force sum
+
+        # TODO shear force
+
+        # TODO viscous damping force
+
         # find pairs of particles undergoing a collision
-        D = squareform(pdist(self.state[:, :2]))
-        ind1, ind2 = np.where(D < 2 * self.size)
-        unique = (ind1 < ind2)
-        ind1 = ind1[unique]
-        ind2 = ind2[unique]
+        # D = squareform(pdist(self.state[:, :2]))
+        # ind1, ind2 = np.where(D < 2 * self.size)
+        # unique = (ind1 < ind2)
+        # ind1 = ind1[unique]
+        # ind2 = ind2[unique]
 
         self.boundary_func()
 
@@ -104,7 +106,7 @@ class ParticleBox:
 #------------------------------------------------------------
 # set up initial state
 np.random.seed(2)
-Npart = 20
+Npart = 3
 init_state = -0.5 + np.random.random((Npart, 4))
 init_state[:, :2] *= 3.9
 dt = 1. / 30 # 30fps
