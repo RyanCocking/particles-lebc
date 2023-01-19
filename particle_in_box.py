@@ -28,16 +28,16 @@ class ParticleBox:
     bounds is the size of the box: [xmin, xmax, ymin, ymax]
     """
     def __init__(self,
-                 init_state = [[1, 0, 0, -1],
-                               [-0.5, 0.5, 0.5, 0.5],
-                               [-0.5, -0.5, -0.5, 0.5]],
+                 init_state = [[1, 0, 0, -1]],
                  bounds = [-1, 1, -1, 1],
                  size = 0.04,
                  shear_rate = 0):
         self.init_state = np.asarray(init_state, dtype=float)
         self.size = size
         self.state = self.init_state.copy()
-        self.bounds = bounds
+        self.bounds = np.asarray(bounds)
+        self.box_size_x = bounds[1] - bounds[0]
+        self.box_size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
         self.offset_x = 0
 
@@ -46,6 +46,25 @@ class ParticleBox:
         else:
             self.boundary_func = self.boundary_pbc
 
+        # eight images, starting at top, going clockwise
+        self.ghost_state = np.repeat(self.state[np.newaxis, :, :], 8, axis=0)
+        self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
+
+        right = [2, 3, 4]
+        left = [6, 7, 0]
+        top = [0, 1, 2]
+        bot = [4, 5, 6]
+
+        self.ghost_state[right, :, 0] += self.box_size_x
+        self.ghost_state[left, :, 0] -= self.box_size_x
+        self.ghost_state[top, :, 1] += self.box_size_y
+        self.ghost_state[bot, :, 1] -= self.box_size_y
+
+        self.ghost_bounds[right, :2] += self.box_size_x
+        self.ghost_bounds[left, :2] -= self.box_size_x
+        self.ghost_bounds[top, 2:] += self.box_size_y
+        self.ghost_bounds[bot, 2:] -= self.box_size_y
+            
     def boundary_pbc(self):
         # check for crossing boundary
         crossed_x1 = (self.state[:, 0] < self.bounds[0])
@@ -106,18 +125,21 @@ class ParticleBox:
 #------------------------------------------------------------
 # set up initial state
 np.random.seed(2)
-Npart = 3
+Npart = 10
 init_state = -0.5 + np.random.random((Npart, 4))
 init_state[:, :2] *= 3.9
 dt = 1. / 30 # 30fps
 
+print("Initialising particles...")
 box = ParticleBox(init_state, size=0.04, shear_rate=0.0)
 box.set_lebc_offset(dt)
 # else:
 #     box = ParticleBox(init_state, size=0.04)
 
+print("Done")
 #------------------------------------------------------------
 # set up figure and animation
+print("Setting up plots...")
 fig = plt.figure()
 fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 ax = fig.add_subplot(111, aspect='equal', autoscale_on=False,
@@ -185,6 +207,8 @@ ax.add_patch(rect)
 for item in image_rect:
     ax.add_patch(item)
 
+print("Done")
+
 def init():
     """initialize animation"""
     global box, rect
@@ -192,11 +216,12 @@ def init():
     images.set_data([], [])
     rect.set_edgecolor('r')
     # image_rect.set_edgecolor('none')
-    return particles, rect, images, (*image_rect)
+    return particles, rect, images, *image_rect
 
 def animate(i):
     """perform animation step"""
     global box, rect, image_rect, dt, ax, fig
+    print(f"Step = {i}", end="\r")
     box.step(dt)
 
     ms = int(fig.dpi * 2 * box.size * fig.get_figwidth()
@@ -230,7 +255,7 @@ def animate(i):
     particles.set_markersize(ms)
     images.set_data(draw_state_x, draw_state_y)
     images.set_markersize(ms)
-    return particles, images, (*image_rect), rect
+    return particles, images, *image_rect, rect
 
 ani = animation.FuncAnimation(fig, animate, frames=600,
                               interval=10, blit=True, init_func=init, save_count=1500)
