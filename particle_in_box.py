@@ -11,11 +11,14 @@ license: BSD
 Please feel free to use and modify this, but keep the above information. Thanks!
 """
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
 
 import matplotlib.pyplot as plt
-import scipy.integrate as integrate
 import matplotlib.animation as animation
+
+from omegaconf import OmegaConf
+
+conf = OmegaConf.load("config.yml")
+
 
 class ParticleBox:
     """Orbits class
@@ -27,11 +30,10 @@ class ParticleBox:
 
     bounds is the size of the box: [xmin, xmax, ymin, ymax]
     """
-    def __init__(self,
-                 init_state = [[1, 0, 0, -1]],
-                 bounds = [-1, 1, -1, 1],
-                 size = 0.04,
-                 shear_rate = 0):
+
+    def __init__(
+        self, init_state=[[1, 0, 0, -1]], bounds=[-1, 1, -1, 1], size=0.04, shear_rate=0
+    ):
         self.init_state = np.asarray(init_state, dtype=float)
         self.size = size
         self.state = self.init_state.copy()
@@ -64,13 +66,13 @@ class ParticleBox:
         self.ghost_bounds[left, :2] -= self.box_size_x
         self.ghost_bounds[top, 2:] += self.box_size_y
         self.ghost_bounds[bot, 2:] -= self.box_size_y
-            
+
     def boundary_pbc(self):
         # check for crossing boundary
-        crossed_x1 = (self.state[:, 0] < self.bounds[0])
-        crossed_x2 = (self.state[:, 0] > self.bounds[1])
-        crossed_y1 = (self.state[:, 1] < self.bounds[2])
-        crossed_y2 = (self.state[:, 1] > self.bounds[3])
+        crossed_x1 = self.state[:, 0] < self.bounds[0]
+        crossed_x2 = self.state[:, 0] > self.bounds[1]
+        crossed_y1 = self.state[:, 1] < self.bounds[2]
+        crossed_y2 = self.state[:, 1] > self.bounds[3]
 
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
@@ -79,10 +81,10 @@ class ParticleBox:
         self.state[crossed_y2, 1] = self.bounds[2]
 
     def boundary_lebc(self):
-        crossed_x1 = (self.state[:, 0] < self.bounds[0])
-        crossed_x2 = (self.state[:, 0] > self.bounds[1])
-        crossed_y1 = (self.state[:, 1] < self.bounds[2])
-        crossed_y2 = (self.state[:, 1] > self.bounds[3])
+        crossed_x1 = self.state[:, 0] < self.bounds[0]
+        crossed_x2 = self.state[:, 0] > self.bounds[1]
+        crossed_y1 = self.state[:, 1] < self.bounds[2]
+        crossed_y2 = self.state[:, 1] > self.bounds[3]
 
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
@@ -122,85 +124,120 @@ class ParticleBox:
         self.boundary_func()
 
 
-#------------------------------------------------------------
+# ------------------------------------------------------------
 # set up initial state
 np.random.seed(2)
-Npart = 10
-init_state = -0.5 + np.random.random((Npart, 4))
-init_state[:, :2] *= 3.9
-dt = 1. / 30 # 30fps
+init_state = -0.5 + np.random.random((conf["Npart"], 4))
+init_state[:, :2] *= 3.9  # 30fps
 
 print("Initialising particles...")
-box = ParticleBox(init_state, size=0.04, shear_rate=0.0)
-box.set_lebc_offset(dt)
+box = ParticleBox(init_state, size=conf["radius"], shear_rate=conf["shear_rate"])
+box.set_lebc_offset(conf["dt"])
 # else:
 #     box = ParticleBox(init_state, size=0.04)
 
 print("Done")
-#------------------------------------------------------------
+# ------------------------------------------------------------
 # set up figure and animation
 print("Setting up plots...")
 fig = plt.figure()
 fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-ax = fig.add_subplot(111, aspect='equal', autoscale_on=False,
-                     xlim=(-3.2, 3.2), ylim=(-2.4, 2.4))
+ax = fig.add_subplot(
+    111, aspect="equal", autoscale_on=False, xlim=(-3.2, 3.2), ylim=(-2.4, 2.4)
+)
 
 # particles holds the locations of the particles
-particles, = ax.plot([], [], 'bo', ms=6)
+(particles,) = ax.plot([], [], "bo", ms=6)
 
 # images of the periodic copies
-images, = ax.plot([], [], 'co', ms=6)
+(images,) = ax.plot([], [], "co", ms=6)
 
 # rect is the box edge
 offset_x = box.bounds[1] - box.bounds[0]
 offset_y = box.bounds[3] - box.bounds[2]
 
-rect = plt.Rectangle(box.bounds[::2],
-                     box.bounds[1] - box.bounds[0],
-                     box.bounds[3] - box.bounds[2],
-                     ec='r', lw=2, fc='none')
+rect = plt.Rectangle(
+    box.bounds[::2],
+    box.bounds[1] - box.bounds[0],
+    box.bounds[3] - box.bounds[2],
+    ec="r",
+    lw=2,
+    fc="none",
+)
 
 image_rect = [
     plt.Rectangle(
         [box.bounds[0] + box.offset_x, box.bounds[2] + offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] + offset_x + box.offset_x, box.bounds[2] + offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] + offset_x, box.bounds[2]],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] + offset_x - box.offset_x, box.bounds[2] - offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] - box.offset_x, box.bounds[2] - offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] - offset_x - box.offset_x, box.bounds[2] - offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] - offset_x, box.bounds[2]],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-'),
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
     plt.Rectangle(
         [box.bounds[0] - offset_x + box.offset_x, box.bounds[2] + offset_y],
         box.bounds[1] - box.bounds[0],
         box.bounds[3] - box.bounds[2],
-        ec='k', lw=2, fc='none', ls='-')
+        ec="k",
+        lw=2,
+        fc="none",
+        ls="-",
+    ),
 ]
 
 ax.add_patch(rect)
@@ -209,56 +246,63 @@ for item in image_rect:
 
 print("Done")
 
+
 def init():
     """initialize animation"""
-    global box, rect
+    # global box, rect
     particles.set_data([], [])
     images.set_data([], [])
-    rect.set_edgecolor('r')
+    rect.set_edgecolor("r")
     # image_rect.set_edgecolor('none')
-    return particles, rect, images, *image_rect
+    return (particles, rect, images, *image_rect)
+
 
 def animate(i):
     """perform animation step"""
     global box, rect, image_rect, dt, ax, fig
     print(f"Step = {i}", end="\r")
-    box.step(dt)
+    box.step(conf["dt"])
 
-    ms = int(fig.dpi * 2 * box.size * fig.get_figwidth()
-             / np.diff(ax.get_xbound())[0])
+    ms = int(fig.dpi * 2 * box.size * fig.get_figwidth() / np.diff(ax.get_xbound())[0])
 
     # draw eight periodic copies of particles (clockwise from top)
-    draw_state_x = np.append(box.state[:, 0] + box.offset_x,
-    [
-        box.state[:, 0] + offset_x + box.offset_x,
-        box.state[:, 0] + offset_x,
-        box.state[:, 0] + offset_x - box.offset_x,
-        box.state[:, 0] - box.offset_x,
-        box.state[:, 0] - offset_x - box.offset_x,
-        box.state[:, 0] - offset_x,
-        box.state[:, 0] - offset_x + box.offset_x
-    ])
-    draw_state_y = np.append(box.state[:, 1] + offset_y,
-    [
+    draw_state_x = np.append(
+        box.state[:, 0] + box.offset_x,
+        [
+            box.state[:, 0] + offset_x + box.offset_x,
+            box.state[:, 0] + offset_x,
+            box.state[:, 0] + offset_x - box.offset_x,
+            box.state[:, 0] - box.offset_x,
+            box.state[:, 0] - offset_x - box.offset_x,
+            box.state[:, 0] - offset_x,
+            box.state[:, 0] - offset_x + box.offset_x,
+        ],
+    )
+    draw_state_y = np.append(
         box.state[:, 1] + offset_y,
-        box.state[:, 1],
-        box.state[:, 1] - offset_y,
-        box.state[:, 1] - offset_y,
-        box.state[:, 1] - offset_y,
-        box.state[:, 1],
-        box.state[:, 1] + offset_y
-    ])
+        [
+            box.state[:, 1] + offset_y,
+            box.state[:, 1],
+            box.state[:, 1] - offset_y,
+            box.state[:, 1] - offset_y,
+            box.state[:, 1] - offset_y,
+            box.state[:, 1],
+            box.state[:, 1] + offset_y,
+        ],
+    )
 
     # update pieces of the animation
-    rect.set_edgecolor('r')
+    rect.set_edgecolor("r")
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
     images.set_data(draw_state_x, draw_state_y)
     images.set_markersize(ms)
-    return particles, images, *image_rect, rect
+    return (particles, images, *image_rect, rect)
 
-ani = animation.FuncAnimation(fig, animate, frames=600,
-                              interval=10, blit=True, init_func=init, save_count=1500)
+
+ani = animation.FuncAnimation(
+    fig, animate, frames=600, interval=10, blit=True, init_func=init, save_count=1500
+)
 
 
 # save the animation as an mp4.  This requires ffmpeg or mencoder to be

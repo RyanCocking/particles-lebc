@@ -1,0 +1,4 @@
+Npart: 3
+radius: 0.05
+shear_rate: 0.0
+dt: 0.03
