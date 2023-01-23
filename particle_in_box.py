@@ -31,15 +31,12 @@ class ParticleBox:
     bounds is the size of the box: [xmin, xmax, ymin, ymax]
     """
 
-    def __init__(
-        self, init_state=[[1, 0, 0, -1]], bounds=[-1, 1, -1, 1], size=0.04, shear_rate=0
-    ):
+    def __init__(self, init_state=[[1, 0, 0, -1]], bounds=[-1, 1, -1, 1], shear_rate=0):
         self.init_state = np.asarray(init_state, dtype=float)
-        self.size = size
         self.state = self.init_state.copy()
         self.bounds = np.asarray(bounds)
-        self.box_size_x = bounds[1] - bounds[0]
-        self.box_size_y = bounds[3] - bounds[2]
+        self.size_x = bounds[1] - bounds[0]
+        self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
         self.offset_x = 0
 
@@ -52,20 +49,23 @@ class ParticleBox:
         self.ghost_state = np.repeat(self.state[np.newaxis, :, :], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
 
-        right = [2, 3, 4]
-        left = [6, 7, 0]
-        top = [0, 1, 2]
-        bot = [4, 5, 6]
+        self.ghost_bounds[[2, 3, 4], :2] += self.size_x  # right
+        self.ghost_bounds[[6, 7, 0], :2] -= self.size_x  # left
+        self.ghost_bounds[[0, 1, 2], 2:] += self.size_y  # top
+        self.ghost_bounds[[4, 5, 6], 2:] -= self.size_y  # bottom
 
-        self.ghost_state[right, :, 0] += self.box_size_x
-        self.ghost_state[left, :, 0] -= self.box_size_x
-        self.ghost_state[top, :, 1] += self.box_size_y
-        self.ghost_state[bot, :, 1] -= self.box_size_y
+    def update_ghosts(self):
+        self.ghost_state[[2, 3, 4], :, 0] = self.state[:, 0] + self.size_x
+        self.ghost_state[[2, 3, 4], :, 1] = self.state[:, 1]
 
-        self.ghost_bounds[right, :2] += self.box_size_x
-        self.ghost_bounds[left, :2] -= self.box_size_x
-        self.ghost_bounds[top, 2:] += self.box_size_y
-        self.ghost_bounds[bot, 2:] -= self.box_size_y
+        self.ghost_state[[6, 7, 0], :, 0] = self.state[:, 0] - self.size_x
+        self.ghost_state[[6, 7, 0], :, 1] = self.state[:, 1]
+
+        self.ghost_state[[0, 1, 2], :, 0] = self.state[:, 0]
+        self.ghost_state[[0, 1, 2], :, 1] = self.state[:, 1] + self.size_y
+
+        self.ghost_state[[4, 5, 6], :, 0] = self.state[:, 0]
+        self.ghost_state[[4, 5, 6], :, 1] = self.state[:, 1] - self.size_y
 
     def boundary_pbc(self):
         # check for crossing boundary
@@ -106,7 +106,8 @@ class ParticleBox:
         """step once by dt seconds"""
 
         # update positions
-        self.state[:, :2] += dt * self.state[:, 2:]
+        self.state[:, :2] += self.state[:, 2:] * dt
+        self.update_ghosts()
 
         # TODO position update in context of force sum
 
@@ -131,10 +132,8 @@ init_state = -0.5 + np.random.random((conf["Npart"], 4))
 init_state[:, :2] *= 3.9  # 30fps
 
 print("Initialising particles...")
-box = ParticleBox(init_state, size=conf["radius"], shear_rate=conf["shear_rate"])
+box = ParticleBox(init_state, shear_rate=conf["shear_rate"])
 box.set_lebc_offset(conf["dt"])
-# else:
-#     box = ParticleBox(init_state, size=0.04)
 
 print("Done")
 # ------------------------------------------------------------
@@ -152,96 +151,30 @@ ax = fig.add_subplot(
 # images of the periodic copies
 (images,) = ax.plot([], [], "co", ms=6)
 
-# rect is the box edge
-offset_x = box.bounds[1] - box.bounds[0]
-offset_y = box.bounds[3] - box.bounds[2]
-
 rect = plt.Rectangle(
     box.bounds[::2],
-    box.bounds[1] - box.bounds[0],
-    box.bounds[3] - box.bounds[2],
+    box.size_x,
+    box.size_y,
     ec="r",
     lw=2,
     fc="none",
 )
 
-image_rect = [
+ghost_rect = [
     plt.Rectangle(
-        [box.bounds[0] + box.offset_x, box.bounds[2] + offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
+        gb[::2],
+        box.size_x,
+        box.size_y,
         ec="k",
         lw=2,
         fc="none",
         ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] + offset_x + box.offset_x, box.bounds[2] + offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] + offset_x, box.bounds[2]],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] + offset_x - box.offset_x, box.bounds[2] - offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] - box.offset_x, box.bounds[2] - offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] - offset_x - box.offset_x, box.bounds[2] - offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] - offset_x, box.bounds[2]],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
-    plt.Rectangle(
-        [box.bounds[0] - offset_x + box.offset_x, box.bounds[2] + offset_y],
-        box.bounds[1] - box.bounds[0],
-        box.bounds[3] - box.bounds[2],
-        ec="k",
-        lw=2,
-        fc="none",
-        ls="-",
-    ),
+    )
+    for gb in box.ghost_bounds
 ]
 
 ax.add_patch(rect)
-for item in image_rect:
+for item in ghost_rect:
     ax.add_patch(item)
 
 print("Done")
@@ -253,51 +186,31 @@ def init():
     particles.set_data([], [])
     images.set_data([], [])
     rect.set_edgecolor("r")
-    # image_rect.set_edgecolor('none')
-    return (particles, rect, images, *image_rect)
+    # ghost_rect.set_edgecolor('none')
+    return (particles, rect, images, *ghost_rect)
 
 
 def animate(i):
     """perform animation step"""
-    global box, rect, image_rect, dt, ax, fig
+    global box, rect, ghost_rect, ax, fig
     print(f"Step = {i}", end="\r")
     box.step(conf["dt"])
 
-    ms = int(fig.dpi * 2 * box.size * fig.get_figwidth() / np.diff(ax.get_xbound())[0])
-
-    # draw eight periodic copies of particles (clockwise from top)
-    draw_state_x = np.append(
-        box.state[:, 0] + box.offset_x,
-        [
-            box.state[:, 0] + offset_x + box.offset_x,
-            box.state[:, 0] + offset_x,
-            box.state[:, 0] + offset_x - box.offset_x,
-            box.state[:, 0] - box.offset_x,
-            box.state[:, 0] - offset_x - box.offset_x,
-            box.state[:, 0] - offset_x,
-            box.state[:, 0] - offset_x + box.offset_x,
-        ],
-    )
-    draw_state_y = np.append(
-        box.state[:, 1] + offset_y,
-        [
-            box.state[:, 1] + offset_y,
-            box.state[:, 1],
-            box.state[:, 1] - offset_y,
-            box.state[:, 1] - offset_y,
-            box.state[:, 1] - offset_y,
-            box.state[:, 1],
-            box.state[:, 1] + offset_y,
-        ],
+    ms = int(
+        fig.dpi
+        * 2
+        * conf["part_radius"]
+        * fig.get_figwidth()
+        / np.diff(ax.get_xbound())[0]
     )
 
     # update pieces of the animation
     rect.set_edgecolor("r")
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
-    images.set_data(draw_state_x, draw_state_y)
+    images.set_data(box.ghost_state[:, :, 0], box.ghost_state[:, :, 1])
     images.set_markersize(ms)
-    return (particles, images, *image_rect, rect)
+    return (particles, images, *ghost_rect, rect)
 
 
 ani = animation.FuncAnimation(
@@ -305,11 +218,8 @@ ani = animation.FuncAnimation(
 )
 
 
-# save the animation as an mp4.  This requires ffmpeg or mencoder to be
-# installed.  The extra_args ensure that the x264 codec is used, so that
-# the video can be embedded in html5.  You may need to adjust this for
-# your system: for more information, see
-# http://matplotlib.sourceforge.net/api/animation_api.html
+# saving as mp4 requires ffmpeg or mencoder to be installed. for more
+# information, see http://matplotlib.sourceforge.net/api/animation_api.html
 # ani.save('particle_box.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
 
 plt.show()

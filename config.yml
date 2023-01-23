@@ -1,4 +1,4 @@
-Npart: 3
-radius: 0.05
+Npart: 2
+part_radius: 0.05
 shear_rate: 0.0
 dt: 0.03
