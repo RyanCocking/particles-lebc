@@ -20,8 +20,8 @@ from time import time
 from omegaconf import OmegaConf
 
 conf = OmegaConf.load("config.yml")
-conf["drag"] = 6.0 * np.pi * conf["viscosity"] * conf["part_radius"]
-conf["D"] = conf["KT"] / conf["drag"]
+conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]
+conf["D"] = conf["KT"] / conf["mu"]
 
 
 class ParticleBox:
@@ -106,26 +106,32 @@ class ParticleBox:
             n += 1
             self.offset_x = self.shear_rate * dt * L_y - n * L_y
 
-    def step(self, dt):
-        """step once by dt seconds"""
+    def force_noise(self, thermal_energy, drag_coef, timestep):
+        """From fluctuation-dissipation theorem."""
+        mag = np.sqrt(24 * thermal_energy * drag_coef / timestep)
+        return mag * (np.random.random(self.state[:, :2].shape) - 0.5)
+
+    def force_shear(self, drag_scaling):
+        """From Ridley thesis p51."""
+        return (
+            self.shear_rate
+            * box.size_y
+            * drag_scaling
+            * (self.state[:, 1] / box.size_y - 0.5)
+        )
+
+    def step(self):
+        # self.state[:, 0] += (conf["dt"] / conf["drag"]) * (force_shear + force_noise(conf["KT"], conf["mu"], conf["dt"]))
+        # self.state[:, 0] += (conf["dt"] / conf["drag"]) * (force_shear + force_noise(conf["KT"], conf["mu"], conf["dt"]))
+
+        dt_mu = conf["dt"] / conf["mu"]
+        self.state[:, :2] += dt_mu * self.force_noise(
+            conf["KT"], conf["mu"], conf["dt"]
+        )
 
         # update positions (v*dt)
-        self.state[:, :2] += self.state[:, 2:] * dt
+        # self.state[:, :2] += self.state[:, 2:] * conf["dt"]
         self.update_ghosts()
-
-        # TODO position update in context of force sum
-
-        # TODO shear force
-
-        # TODO viscous damping force
-
-        # find pairs of particles undergoing a collision
-        # D = squareform(pdist(self.state[:, :2]))
-        # ind1, ind2 = np.where(D < 2 * self.size)
-        # unique = (ind1 < ind2)
-        # ind1 = ind1[unique]
-        # ind2 = ind2[unique]
-
         self.boundary_func()
 
 
@@ -212,7 +218,6 @@ print("Done")
 
 def init():
     """initialize animation"""
-    # global box, rect
     particles.set_data([], [])
     images.set_data([], [])
     rect.set_edgecolor("r")
@@ -224,7 +229,7 @@ def animate(i):
     """perform animation step"""
     global box, rect, ghost_rect, ax, fig
     print(f"Step = {i}", end="\r")
-    box.step(conf["dt"])
+    box.step()
 
     ms = int(
         fig.dpi * 2 * box.part_radius * fig.get_figwidth() / np.diff(ax.get_xbound())[0]

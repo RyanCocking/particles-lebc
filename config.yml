@@ -1,9 +1,9 @@
-Npart: 10
+Npart: 3
 shear_rate: 0.0     # [s^-1]
-dt: 0.03
+dt: 1.0e-10         # [s]
 box_size_x: 50.0e-9       # [m]
 box_size_y: 50.0e-9       # [m]
 
 KT: 4.141947e-21      # [m^2 kg s^-2]
-viscosity: 1.0e-3      # water [Pa]
+eta: 1.0e-3      # viscosity of water [Pa]
 part_radius: 1.0e-9   # [m]
