@@ -5,5 +5,5 @@ box_size_x: 50.0e-9       # [m]
 box_size_y: 50.0e-9       # [m]
 
 KT: 4.141947e-21      # [m^2 kg s^-2]
-viscosity: 0.001      # water [Pa]
+viscosity: 1.0e-3      # water [Pa]
 part_radius: 1.0e-9   # [m]

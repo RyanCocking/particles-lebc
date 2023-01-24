@@ -20,6 +20,8 @@ from time import time
 from omegaconf import OmegaConf
 
 conf = OmegaConf.load("config.yml")
+conf["drag"] = 6.0 * np.pi * conf["viscosity"] * conf["part_radius"]
+conf["D"] = conf["KT"] / conf["drag"]
 
 
 class ParticleBox:
@@ -64,7 +66,6 @@ class ParticleBox:
 
     def update_ghosts(self):
         self.ghost_pos[:, :, :] = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
-
         self.ghost_pos[[2, 3, 4], :, 0] += self.size_x
         self.ghost_pos[[6, 7, 0], :, 0] -= self.size_x
         self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
@@ -108,7 +109,7 @@ class ParticleBox:
     def step(self, dt):
         """step once by dt seconds"""
 
-        # update positions
+        # update positions (v*dt)
         self.state[:, :2] += self.state[:, 2:] * dt
         self.update_ghosts()
 
