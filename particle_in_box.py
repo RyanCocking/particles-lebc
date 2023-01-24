@@ -15,6 +15,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
+from time import time
+
 from omegaconf import OmegaConf
 
 conf = OmegaConf.load("config.yml")
@@ -31,10 +33,17 @@ class ParticleBox:
     bounds is the size of the box: [xmin, xmax, ymin, ymax]
     """
 
-    def __init__(self, init_state=[[1, 0, 0, -1]], bounds=[-1, 1, -1, 1], shear_rate=0):
+    def __init__(
+        self,
+        init_state=[[1, 0, 0, -1]],
+        bounds=[-1, 1, -1, 1],
+        shear_rate=0,
+        radius=0.05,
+    ):
         self.init_state = np.asarray(init_state, dtype=float)
         self.state = self.init_state.copy()
         self.bounds = np.asarray(bounds)
+        self.part_radius = radius
         self.size_x = bounds[1] - bounds[0]
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
@@ -127,12 +136,37 @@ class ParticleBox:
 
 # ------------------------------------------------------------
 # set up initial state
-np.random.seed(2)
-init_state = -0.5 + np.random.random((conf["Npart"], 4))
-init_state[:, :2] *= 3.9  # 30fps
+factor = min(conf["box_size_x"], conf["box_size_y"]) / (2 * conf["part_radius"])
+if factor <= 5:
+    print(
+        f"Error: box size should be at least a factor of 5 larger than particle diameter (currently {factor:.2f})."
+    )
+    quit()
+
+np.random.seed(int(time()))
+init_state = np.zeros((conf["Npart"], 4))
+init_state[:, :2] = (np.random.random((conf["Npart"], 2)) - 0.5) * min(
+    conf["box_size_x"], conf["box_size_y"]
+)
+init_state[:, 2:] = (
+    np.random.random((conf["Npart"], 2)) * conf["part_radius"] / conf["dt"]
+)
+
+
+print(init_state)
 
 print("Initialising particles...")
-box = ParticleBox(init_state, shear_rate=conf["shear_rate"])
+box = ParticleBox(
+    init_state,
+    radius=conf["part_radius"],
+    shear_rate=conf["shear_rate"],
+    bounds=[
+        -0.5 * conf["box_size_x"],
+        0.5 * conf["box_size_x"],
+        -0.5 * conf["box_size_y"],
+        0.5 * conf["box_size_y"],
+    ],
+)
 box.set_lebc_offset(conf["dt"])
 
 print("Done")
@@ -142,7 +176,11 @@ print("Setting up plots...")
 fig = plt.figure()
 fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 ax = fig.add_subplot(
-    111, aspect="equal", autoscale_on=False, xlim=(-3.2, 3.2), ylim=(-2.4, 2.4)
+    111,
+    aspect="equal",
+    autoscale_on=False,
+    xlim=(-1.8 * conf["box_size_x"], 1.8 * conf["box_size_x"]),
+    ylim=(-1.8 * conf["box_size_y"], 1.8 * conf["box_size_y"]),
 )
 
 # particles holds the locations of the particles
@@ -197,11 +235,7 @@ def animate(i):
     box.step(conf["dt"])
 
     ms = int(
-        fig.dpi
-        * 2
-        * conf["part_radius"]
-        * fig.get_figwidth()
-        / np.diff(ax.get_xbound())[0]
+        fig.dpi * 2 * box.part_radius * fig.get_figwidth() / np.diff(ax.get_xbound())[0]
     )
 
     # update pieces of the animation
