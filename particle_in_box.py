@@ -113,25 +113,24 @@ class ParticleBox:
 
     def force_shear_x(self, drag_coef):
         """From Ridley thesis p51."""
-        force = np.array(
-            [
-                self.shear_rate
-                * box.size_y
-                * drag_coef
-                * (self.state[:, 1] / box.size_y - 0.5),
-                np.zeros(self.state.shape[0]),
-            ]
+        force = (
+            self.shear_rate
+            * box.size_y
+            * drag_coef
+            * (self.state[:, 1] / box.size_y - 0.5)
         )
-        return np.reshape(force, (self.state.shape[0], 2))
+        return np.column_stack((force, np.zeros(self.state.shape[0])))
 
     def step(self):
         dt_mu = conf["dt"] / conf["mu"]
         noise = self.force_noise(conf["KT"], conf["mu"], conf["dt"])
         shear = self.force_shear_x(conf["mu"])
 
-        print(
-            f"F_noise = ({noise[0,0]/1e-9: .2e}, {noise[0,1]/1e-9: .2e})  F_shear = ({shear[0,0]/1e-9: .2e}, {shear[0,1]/1e-9: .2e}) [nN]"
-        )
+        for i in range(conf["Npart"]):
+            print(
+                f"F_noise = ({noise[i,0]/1e-9: .2e}, {noise[i,1]/1e-9: .2e})  F_shear = ({shear[i,0]/1e-9: .2e}, {shear[i,1]/1e-9: .2e}) [nN]"
+            )
+        print()
 
         self.state[:, :2] += dt_mu * (noise + shear)
         self.update_ghosts()
