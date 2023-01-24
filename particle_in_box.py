@@ -20,8 +20,8 @@ from time import time
 from omegaconf import OmegaConf
 
 conf = OmegaConf.load("config.yml")
-conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]
-conf["D"] = conf["KT"] / conf["mu"]
+conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]  # [kg s^-1]
+conf["D"] = conf["KT"] / conf["mu"]  # [m^2 s^1]
 
 
 class ParticleBox:
@@ -111,26 +111,29 @@ class ParticleBox:
         mag = np.sqrt(24 * thermal_energy * drag_coef / timestep)
         return mag * (np.random.random(self.state[:, :2].shape) - 0.5)
 
-    def force_shear(self, drag_scaling):
+    def force_shear_x(self, drag_coef):
         """From Ridley thesis p51."""
-        return (
-            self.shear_rate
-            * box.size_y
-            * drag_scaling
-            * (self.state[:, 1] / box.size_y - 0.5)
+        force = np.array(
+            [
+                self.shear_rate
+                * box.size_y
+                * drag_coef
+                * (self.state[:, 1] / box.size_y - 0.5),
+                np.zeros(self.state.shape[0]),
+            ]
         )
+        return np.reshape(force, (self.state.shape[0], 2))
 
     def step(self):
-        # self.state[:, 0] += (conf["dt"] / conf["drag"]) * (force_shear + force_noise(conf["KT"], conf["mu"], conf["dt"]))
-        # self.state[:, 0] += (conf["dt"] / conf["drag"]) * (force_shear + force_noise(conf["KT"], conf["mu"], conf["dt"]))
-
         dt_mu = conf["dt"] / conf["mu"]
-        self.state[:, :2] += dt_mu * self.force_noise(
-            conf["KT"], conf["mu"], conf["dt"]
+        noise = self.force_noise(conf["KT"], conf["mu"], conf["dt"])
+        shear = self.force_shear_x(conf["mu"])
+
+        print(
+            f"F_noise = ({noise[0,0]/1e-9: .2e}, {noise[0,1]/1e-9: .2e})  F_shear = ({shear[0,0]/1e-9: .2e}, {shear[0,1]/1e-9: .2e}) [nN]"
         )
 
-        # update positions (v*dt)
-        # self.state[:, :2] += self.state[:, 2:] * conf["dt"]
+        self.state[:, :2] += dt_mu * (noise + shear)
         self.update_ghosts()
         self.boundary_func()
 
