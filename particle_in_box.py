@@ -54,8 +54,7 @@ class ParticleBox:
         else:
             self.boundary_func = self.boundary_pbc
 
-        # eight images, starting at top, going clockwise
-        self.ghost_state = np.repeat(self.state[np.newaxis, :, :], 8, axis=0)
+        self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
 
         self.ghost_bounds[[2, 3, 4], :2] += self.size_x  # right
@@ -64,17 +63,12 @@ class ParticleBox:
         self.ghost_bounds[[4, 5, 6], 2:] -= self.size_y  # bottom
 
     def update_ghosts(self):
-        self.ghost_state[[2, 3, 4], :, 0] = self.state[:, 0] + self.size_x
-        self.ghost_state[[2, 3, 4], :, 1] = self.state[:, 1]
+        self.ghost_pos[:, :, :] = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
 
-        self.ghost_state[[6, 7, 0], :, 0] = self.state[:, 0] - self.size_x
-        self.ghost_state[[6, 7, 0], :, 1] = self.state[:, 1]
-
-        self.ghost_state[[0, 1, 2], :, 0] = self.state[:, 0]
-        self.ghost_state[[0, 1, 2], :, 1] = self.state[:, 1] + self.size_y
-
-        self.ghost_state[[4, 5, 6], :, 0] = self.state[:, 0]
-        self.ghost_state[[4, 5, 6], :, 1] = self.state[:, 1] - self.size_y
+        self.ghost_pos[[2, 3, 4], :, 0] += self.size_x
+        self.ghost_pos[[6, 7, 0], :, 0] -= self.size_x
+        self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
+        self.ghost_pos[[4, 5, 6], :, 1] -= self.size_y
 
     def boundary_pbc(self):
         # check for crossing boundary
@@ -151,9 +145,6 @@ init_state[:, :2] = (np.random.random((conf["Npart"], 2)) - 0.5) * min(
 init_state[:, 2:] = (
     np.random.random((conf["Npart"], 2)) * conf["part_radius"] / conf["dt"]
 )
-
-
-print(init_state)
 
 print("Initialising particles...")
 box = ParticleBox(
@@ -242,7 +233,7 @@ def animate(i):
     rect.set_edgecolor("r")
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
-    images.set_data(box.ghost_state[:, :, 0], box.ghost_state[:, :, 1])
+    images.set_data(box.ghost_pos[:, :, 0], box.ghost_pos[:, :, 1])
     images.set_markersize(ms)
     return (particles, images, *ghost_rect, rect)
 
