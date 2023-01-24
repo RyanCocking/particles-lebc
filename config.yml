@@ -1,5 +1,5 @@
 Npart: 10
-shear_rate: 2.0e3     # artery [s^-1]
+shear_rate: 2e3    # artery [s^-1]
 dt: 1.0e-12         # [s]
 box_size_x: 50.0e-9       # [m]
 box_size_y: 50.0e-9       # [m]

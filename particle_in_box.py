@@ -122,7 +122,6 @@ class ParticleBox:
         return np.column_stack((force, np.zeros(self.state.shape[0])))
 
     def step(self):
-        dt_mu = conf["dt"] / conf["mu"]
         noise = self.force_noise(conf["KT"], conf["mu"], conf["dt"])
         shear = self.force_shear_x(conf["mu"])
 
@@ -132,7 +131,10 @@ class ParticleBox:
             )
         print()
 
-        self.state[:, :2] += dt_mu * (noise + shear)
+        r_new = self.state[:, :2] + (conf["dt"] / conf["mu"]) * (noise + shear)
+        self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
+        self.state[:, :2] = r_new
+
         self.update_ghosts()
         self.boundary_func()
 
@@ -179,8 +181,8 @@ ax = fig.add_subplot(
     111,
     aspect="equal",
     autoscale_on=False,
-    xlim=(-1.8 * conf["box_size_x"], 1.8 * conf["box_size_x"]),
-    ylim=(-1.8 * conf["box_size_y"], 1.8 * conf["box_size_y"]),
+    xlim=(-2.3 * conf["box_size_x"], 2.3 * conf["box_size_x"]),
+    ylim=(-1.5 * conf["box_size_y"], 1.5 * conf["box_size_y"]),
 )
 
 # particles holds the locations of the particles
