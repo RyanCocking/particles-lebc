@@ -93,10 +93,10 @@ class ParticleBox:
 
     def crossed_boundary(self):
         # check for crossing boundary
-        crossed_x1 = self.state[:, 0] < self.bounds[0]
-        crossed_x2 = self.state[:, 0] > self.bounds[1]
-        crossed_y1 = self.state[:, 1] < self.bounds[2]
-        crossed_y2 = self.state[:, 1] > self.bounds[3]
+        crossed_x1 = self.state[:, 0] < self.bounds[0]  # left
+        crossed_x2 = self.state[:, 0] > self.bounds[1]  # right
+        crossed_y1 = self.state[:, 1] < self.bounds[2]  # bottom
+        crossed_y2 = self.state[:, 1] > self.bounds[3]  # top
 
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
@@ -104,6 +104,10 @@ class ParticleBox:
         self.state[crossed_y2, 1] = self.bounds[2]
 
         # crossing the upper or lower boundary requires an offset in x
+        # e.g. if a particle passes thrtough the upper boundary, its image should
+        # be shifted in the positive x direction.
+        # however, relative to the central box, this particle will appear
+        # at the bottom, having shifted in the negative x direction
         self.state[crossed_y1, 0] += self.lebc_max_offset_x
         self.state[crossed_y2, 0] -= self.lebc_max_offset_x
 
@@ -163,12 +167,6 @@ class ParticleBox:
 
 # ------------------------------------------------------------
 # set up initial state
-factor = min(conf["box_size_x"], conf["box_size_y"]) / (2 * conf["part_radius"])
-if factor <= 5:
-    print(
-        f"Error: box size should be at least a factor of 5 larger than particle diameter (currently {factor:.2f})."
-    )
-    quit()
 
 np.random.seed(int(time()))
 init_state = np.zeros((conf["Npart"], 4))
@@ -192,7 +190,7 @@ box = ParticleBox(
     ],
 )
 
-print(f"Max LEBC offset = {box.lebc_max_offset_x*1e9:.2e} nm")
+print(f"Max LEBC offset = {box.lebc_max_offset_x:.2e} m")
 
 print("Done")
 # ------------------------------------------------------------
