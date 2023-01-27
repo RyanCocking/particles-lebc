@@ -1,4 +1,7 @@
-traj_file: "traj.txt"
+traj_file: "traj.csv"
+save_video: False
+Nsteps: 50
+fps: 30
 Npart: 2
 shear_rate: 2e3    # artery [s^-1]
 dt: 1.0e-12         # [s]
