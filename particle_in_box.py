@@ -107,14 +107,6 @@ class ParticleBox:
         self.state[crossed_y1, 0] += self.lebc_max_offset_x
         self.state[crossed_y2, 0] -= self.lebc_max_offset_x
 
-    def lebc_particle_offset(self, dt):
-        L_y = self.size_y
-        n = 1
-        self.offset_x = self.shear_rate * dt * L_y
-        while self.offset_x > L_y:
-            n += 1
-            self.offset_x = self.shear_rate * dt * L_y - n * L_y
-
     def lebc_modified_velocity(self):
         pass
 
@@ -124,18 +116,35 @@ class ParticleBox:
         return mag * (np.random.random(self.state[:, :2].shape) - 0.5)
 
     def shear_force(self, drag_coef):
-        """From Ridley thesis p51."""
+        """y coordinate should be in range 0 < y < L. See Ridley p51, Bindgen et al, Lees & Edwards"""
         force = (
             self.shear_rate
             * box.size_y
             * drag_coef
-            * (self.state[:, 1] / box.size_y - 0.5)
+            * ((self.state[:, 1] + 0.5 * box.size_y) / box.size_y - 0.5)
         )
         return np.column_stack((force, np.zeros(self.state.shape[0])))
 
     def step(self):
-        n = self.thermal_noise(conf["KT"], conf["mu"], conf["dt"])
-        r_new = self.state[:, :2] + (conf["dt"] / conf["mu"]) * n
+        if conf["enable_noise"]:
+            n = self.thermal_noise(conf["KT"], conf["mu"], conf["dt"])
+        else:
+            n = 0
+
+        if conf["test_mode"]:
+            v_test = np.column_stack(
+                (np.zeros(self.state.shape[0]), np.ones(self.state.shape[0]))
+            )
+
+        else:
+            v_test = 0
+
+        s = self.shear_force(conf["mu"])
+        r_new = (
+            self.state[:, :2]
+            + (conf["dt"] / conf["mu"]) * (n + s)
+            + v_test * (conf["dt"])
+        )
         self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
         self.state[:, :2] = r_new
 
