@@ -1,4 +1,5 @@
-Npart: 10
+traj_file: "traj.txt"
+Npart: 2
 shear_rate: 2e3    # artery [s^-1]
 dt: 1.0e-12         # [s]
 box_size_x: 50.0e-9       # [m]

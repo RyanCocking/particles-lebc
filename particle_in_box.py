@@ -16,12 +16,16 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from time import time
-
 from omegaconf import OmegaConf
+from pathlib import Path
 
 conf = OmegaConf.load("config.yml")
 conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]  # [kg s^-1]
 conf["D"] = conf["KT"] / conf["mu"]  # [m^2 s^1]
+
+p = Path(conf["traj_file"])
+if p.is_file():
+    p.unlink()
 
 
 class ParticleBox:
@@ -44,12 +48,13 @@ class ParticleBox:
     ):
         self.init_state = np.asarray(init_state, dtype=float)
         self.state = self.init_state.copy()
+        self.step_count = 0
         self.bounds = np.asarray(bounds)
         self.part_radius = radius
         self.size_x = bounds[1] - bounds[0]
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
-        self.offset_x = 0
+        self.offset_x = 1
 
         if abs(self.shear_rate) > 0:
             self.boundary_func = self.boundary_lebc
@@ -59,6 +64,9 @@ class ParticleBox:
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
 
+        # A better idea might be to have an origin vector that represents the
+        # bottom left corner of each box, then we just store one
+        # set of coordinates and transform it eight times [JM Haile, p82].
         self.ghost_bounds[[2, 3, 4], :2] += self.size_x  # right
         self.ghost_bounds[[6, 7, 0], :2] -= self.size_x  # left
         self.ghost_bounds[[0, 1, 2], 2:] += self.size_y  # top
@@ -98,8 +106,8 @@ class ParticleBox:
         self.state[crossed_y2, 0] -= self.offset_x
         self.state[crossed_y2, 1] = self.bounds[2]
 
-    def set_lebc_offset(self, dt):
-        L_y = self.bounds[3] - self.bounds[2]
+    def lebc_offset(self, dt):
+        L_y = self.size_y
         n = 1
         self.offset_x = self.shear_rate * dt * L_y
         while self.offset_x > L_y:
@@ -121,15 +129,21 @@ class ParticleBox:
         )
         return np.column_stack((force, np.zeros(self.state.shape[0])))
 
+    def write_traj(self):
+        with open(conf["traj_file"], "a") as f:
+            for i in range(conf["Npart"]):
+                traj_string = f"{self.state[i, 0]:.2e},{self.state[i, 1]:.2e},{self.state[i, 2]:.2e},{self.state[i, 3]:.2e}\n"
+                f.write(traj_string)
+
     def step(self):
         noise = self.force_noise(conf["KT"], conf["mu"], conf["dt"])
         shear = self.force_shear_x(conf["mu"])
 
-        for i in range(conf["Npart"]):
-            print(
-                f"F_noise = ({noise[i,0]/1e-9: .2e}, {noise[i,1]/1e-9: .2e})  F_shear = ({shear[i,0]/1e-9: .2e}, {shear[i,1]/1e-9: .2e}) [nN]"
-            )
-        print()
+        # for i in range(conf["Npart"]):
+        #     print(
+        #         f"F_noise = ({noise[i,0]/1e-9: .2e}, {noise[i,1]/1e-9: .2e})  F_shear = ({shear[i,0]/1e-9: .2e}, {shear[i,1]/1e-9: .2e}) [nN]"
+        #     )
+        # print()
 
         r_new = self.state[:, :2] + (conf["dt"] / conf["mu"]) * (noise + shear)
         self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
@@ -137,6 +151,9 @@ class ParticleBox:
 
         self.update_ghosts()
         self.boundary_func()
+
+        self.write_traj()
+        self.step_count += 1
 
 
 # ------------------------------------------------------------
@@ -169,7 +186,6 @@ box = ParticleBox(
         0.5 * conf["box_size_y"],
     ],
 )
-box.set_lebc_offset(conf["dt"])
 
 print("Done")
 # ------------------------------------------------------------
@@ -245,18 +261,24 @@ def animate(i):
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[:, :, 0], box.ghost_pos[:, :, 1])
     images.set_markersize(ms)
+    quit()
+
     return (particles, images, *ghost_rect, rect)
 
 
 ani = animation.FuncAnimation(
-    fig, animate, frames=600, interval=10, blit=True, init_func=init, save_count=1500
+    fig,
+    animate,
+    frames=600,
+    interval=10,
+    blit=True,
+    init_func=init,
+    save_count=1500,
 )
-
 
 # saving as mp4 requires ffmpeg or mencoder to be installed. for more
 # information, see http://matplotlib.sourceforge.net/api/animation_api.html
 # ani.save('particle_box.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
-
 plt.show()
 
 # writervideo = animation.FFMpegWriter(fps=60)
