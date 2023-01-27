@@ -22,6 +22,8 @@ from pathlib import Path
 conf = OmegaConf.load("config.yml")
 conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]  # [kg s^-1]
 conf["D"] = conf["KT"] / conf["mu"]  # [m^2 s^1]
+conf["box_size_x"] = 50 * conf["part_radius"]
+conf["box_size_y"] = conf["box_size_x"]
 
 p = Path(conf["traj_file"])
 if p.is_file():
@@ -291,17 +293,35 @@ else:
 
 plt.close()
 traj = np.loadtxt(conf["traj_file"], delimiter=",", dtype=np.float64)
+x = traj[:, 0]
 y = traj[:, 1]
 vx = traj[:, 2]
 for i in range(conf["Npart"]):
     vxi = vx[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
-    plt.plot(vxi, yi, "o")
+    print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
+    plt.plot(vxi, yi, "o", ms=2)
 
-print(np.mean(y, axis=0), np.mean(vx, axis=0))
-
-plt.title("Instantaneous")
+plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
+plt.plot([-np.max(vx), np.max(vx)], [0, 0], "k:")
+plt.title("Instantaneous velocity profile")
 plt.xlabel("x velocity [m/s]")
 plt.ylabel("y position [m]")
+plt.xlim(-np.max(vx), np.max(vx))
+plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.show()
+plt.close()
+
+for i in range(conf["Npart"]):
+    xi = x[i :: conf["Npart"]]
+    yi = y[i :: conf["Npart"]]
+    plt.plot(xi, yi, "o", ms=2)
+
+plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
+plt.plot([-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"]], [0, 0], "k:")
+plt.title("Trajectory")
+plt.xlabel("x position [m]")
+plt.ylabel("y position [m]")
+plt.xlim(-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"])
 plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
 plt.show()

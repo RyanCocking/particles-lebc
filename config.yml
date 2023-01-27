@@ -1,12 +1,10 @@
 traj_file: "traj.csv"
 save_video: True
-Nsteps: 50
+Nsteps: 100
 fps: 30
 Npart: 2
-shear_rate: 2e3    # artery [s^-1]
-dt: 1.0e-12         # [s]
-box_size_x: 50.0e-9       # [m]
-box_size_y: 50.0e-9       # [m]
+shear_rate: 0    # artery [s^-1]
+dt: 1.0e-10         # [s]
 
 KT: 4.141947e-21      # [m^2 kg s^-2]
 eta: 1.0e-3      # viscosity of water [Pa]
