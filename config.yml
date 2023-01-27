@@ -1,5 +1,5 @@
 traj_file: "traj.csv"
-save_video: False
+save_video: True
 Nsteps: 50
 fps: 30
 Npart: 2

@@ -133,7 +133,7 @@ class ParticleBox:
         if self.step_count <= conf["Nsteps"]:
             with open(conf["traj_file"], "a") as f:
                 for i in range(conf["Npart"]):
-                    traj_string = f"{self.state[i, 0]:.2e},{self.state[i, 1]:.2e},{self.state[i, 2]:.2e},{self.state[i, 3]:.2e}\n"
+                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e}\n"
                     f.write(traj_string)
 
     def step(self):
@@ -289,15 +289,19 @@ else:
     # system evolves indefinitely, trajectory only written up to Nsteps
     plt.show()
 
-# traj = np.loadtxt(conf["traj_file"], delimiter=",", dtype=np.float64)
-# y = np.zeros((conf["Npart"], conf["Nsteps"]))
-# vx = np.zeros((conf["Npart"], conf["Nsteps"]))
-# print(traj.shape)
-# traj = np.reshape(traj, (conf["Npart"], int(traj.shape[0] / conf["Npart"])))
-# print(traj.shape)
+plt.close()
+traj = np.loadtxt(conf["traj_file"], delimiter=",", dtype=np.float64)
+y = traj[:, 1]
+vx = traj[:, 2]
+for i in range(conf["Npart"]):
+    vxi = vx[i :: conf["Npart"]]
+    yi = y[i :: conf["Npart"]]
+    plt.plot(vxi, yi, "o")
 
-# plt.xlabel("x velocity [m/s]")
-# plt.ylabel("y position [m]")
-# plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
-# plt.plot(vx, y, "o")
-# plt.show()
+print(np.mean(y, axis=0), np.mean(vx, axis=0))
+
+plt.title("Instantaneous")
+plt.xlabel("x velocity [m/s]")
+plt.ylabel("y position [m]")
+plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.show()
