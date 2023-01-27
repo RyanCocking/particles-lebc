@@ -73,8 +73,15 @@ class ParticleBox:
         self.ghost_pos[:, :, :] = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_pos[[2, 3, 4], :, 0] += self.size_x
         self.ghost_pos[[6, 7, 0], :, 0] -= self.size_x
+        self.ghost_pos[[0, 1, 2], :, 0] += self.lebc_max_offset
         self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
+        self.ghost_pos[[4, 5, 6], :, 1] -= self.lebc_max_offset
         self.ghost_pos[[4, 5, 6], :, 1] -= self.size_y
+
+        self.ghost_bounds[[0, 1, 2], 0] += self.lebc_max_offset
+        self.ghost_bounds[[0, 1, 2], 1] += self.lebc_max_offset
+        self.ghost_bounds[[4, 5, 6], 0] -= self.lebc_max_offset
+        self.ghost_bounds[[4, 5, 6], 1] -= self.lebc_max_offset
 
     def crossed_boundary(self):
         # check for crossing boundary
@@ -168,6 +175,8 @@ box = ParticleBox(
     ],
 )
 
+print(f"Max LEBC offset = {box.lebc_max_offset*1e9:.2e} nm")
+
 print("Done")
 # ------------------------------------------------------------
 # set up figure and animation
@@ -222,7 +231,8 @@ def init():
     particles.set_data([], [])
     images.set_data([], [])
     rect.set_edgecolor("r")
-    # ghost_rect.set_edgecolor('none')
+    for item in ghost_rect:
+        item.set_edgecolor("k")
     return (particles, rect, images, *ghost_rect)
 
 
@@ -238,10 +248,18 @@ def animate(i):
 
     # update pieces of the animation
     rect.set_edgecolor("r")
+    for item in ghost_rect:
+        item.set_edgecolor("k")
+
+    for gr, gb in zip(ghost_rect, box.ghost_bounds):
+        gr.xy = gb[::2]
+
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[:, :, 0], box.ghost_pos[:, :, 1])
     images.set_markersize(ms)
+
+    print(box.ghost_bounds)
 
     return (particles, images, *ghost_rect, rect)
 
@@ -277,7 +295,7 @@ vx = traj[:, 2]
 for i in range(conf["Npart"]):
     vxi = vx[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
-    print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
+    # print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
     plt.plot(vxi, yi, "o", ms=2)
 
 plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
