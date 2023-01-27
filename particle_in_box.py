@@ -56,7 +56,7 @@ class ParticleBox:
         self.size_x = bounds[1] - bounds[0]
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
-        self.lebc_max_offset = conf["shear_rate"] * self.size_y * conf["dt"]
+        self.lebc_max_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
@@ -69,19 +69,27 @@ class ParticleBox:
         self.ghost_bounds[[0, 1, 2], 2:] += self.size_y  # top
         self.ghost_bounds[[4, 5, 6], 2:] -= self.size_y  # bottom
 
-    def update_ghosts(self):
-        self.ghost_pos[:, :, :] = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_pos[[2, 3, 4], :, 0] += self.size_x
         self.ghost_pos[[6, 7, 0], :, 0] -= self.size_x
-        self.ghost_pos[[0, 1, 2], :, 0] += self.lebc_max_offset
         self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
-        self.ghost_pos[[4, 5, 6], :, 1] -= self.lebc_max_offset
         self.ghost_pos[[4, 5, 6], :, 1] -= self.size_y
 
-        self.ghost_bounds[[0, 1, 2], 0] += self.lebc_max_offset
-        self.ghost_bounds[[0, 1, 2], 1] += self.lebc_max_offset
-        self.ghost_bounds[[4, 5, 6], 0] -= self.lebc_max_offset
-        self.ghost_bounds[[4, 5, 6], 1] -= self.lebc_max_offset
+    def update_ghosts(self):
+        self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
+
+        # move particles into ghost cells, shifting by cell midpoints
+        self.ghost_pos[:, :, 0] += np.mean(self.ghost_bounds[:, np.newaxis, :2], axis=2)
+        self.ghost_pos[:, :, 1] += np.mean(self.ghost_bounds[:, np.newaxis, 2:], axis=2)
+
+        self.ghost_bounds[[0, 1, 2], :2] += self.lebc_max_offset_x
+        self.ghost_bounds[[4, 5, 6], :2] -= self.lebc_max_offset_x
+
+        # cell wrapping
+        if self.ghost_bounds[2, 0] > 2 * self.bounds[1]:
+            self.ghost_bounds[[0, 1, 2], :2] -= self.size_x
+
+        if self.ghost_bounds[6, 1] < 2 * self.bounds[0]:
+            self.ghost_bounds[[4, 5, 6], :2] += self.size_x
 
     def crossed_boundary(self):
         # check for crossing boundary
@@ -96,11 +104,8 @@ class ParticleBox:
         self.state[crossed_y2, 1] = self.bounds[2]
 
         # crossing the upper or lower boundary requires an offset in x
-        self.state[crossed_y1, 0] += self.lebc_max_offset
-        self.state[crossed_y2, 0] -= self.lebc_max_offset
-
-    def image_wrap(self):
-        pass
+        self.state[crossed_y1, 0] += self.lebc_max_offset_x
+        self.state[crossed_y2, 0] -= self.lebc_max_offset_x
 
     def lebc_particle_offset(self, dt):
         L_y = self.size_y
@@ -109,6 +114,9 @@ class ParticleBox:
         while self.offset_x > L_y:
             n += 1
             self.offset_x = self.shear_rate * dt * L_y - n * L_y
+
+    def lebc_modified_velocity(self):
+        pass
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
@@ -175,7 +183,7 @@ box = ParticleBox(
     ],
 )
 
-print(f"Max LEBC offset = {box.lebc_max_offset*1e9:.2e} nm")
+print(f"Max LEBC offset = {box.lebc_max_offset_x*1e9:.2e} nm")
 
 print("Done")
 # ------------------------------------------------------------
@@ -258,8 +266,6 @@ def animate(i):
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[:, :, 0], box.ghost_pos[:, :, 1])
     images.set_markersize(ms)
-
-    print(box.ghost_bounds)
 
     return (particles, images, *ghost_rect, rect)
 
