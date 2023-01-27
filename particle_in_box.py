@@ -56,12 +56,7 @@ class ParticleBox:
         self.size_x = bounds[1] - bounds[0]
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
-        self.offset_x = 1
-
-        if abs(self.shear_rate) > 0:
-            self.boundary_func = self.boundary_lebc
-        else:
-            self.boundary_func = self.boundary_pbc
+        self.lebc_max_offset = conf["shear_rate"] * self.size_y * conf["dt"]
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
@@ -81,7 +76,7 @@ class ParticleBox:
         self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
         self.ghost_pos[[4, 5, 6], :, 1] -= self.size_y
 
-    def boundary_pbc(self):
+    def crossed_boundary(self):
         # check for crossing boundary
         crossed_x1 = self.state[:, 0] < self.bounds[0]
         crossed_x2 = self.state[:, 0] > self.bounds[1]
@@ -90,25 +85,17 @@ class ParticleBox:
 
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
-
         self.state[crossed_y1, 1] = self.bounds[3]
         self.state[crossed_y2, 1] = self.bounds[2]
 
-    def boundary_lebc(self):
-        crossed_x1 = self.state[:, 0] < self.bounds[0]
-        crossed_x2 = self.state[:, 0] > self.bounds[1]
-        crossed_y1 = self.state[:, 1] < self.bounds[2]
-        crossed_y2 = self.state[:, 1] > self.bounds[3]
+        # crossing the upper or lower boundary requires an offset in x
+        self.state[crossed_y1, 0] += self.lebc_max_offset
+        self.state[crossed_y2, 0] -= self.lebc_max_offset
 
-        self.state[crossed_x1, 0] = self.bounds[1]
-        self.state[crossed_x2, 0] = self.bounds[0]
+    def image_wrap(self):
+        pass
 
-        self.state[crossed_y1, 0] += self.offset_x
-        self.state[crossed_y1, 1] = self.bounds[3]
-        self.state[crossed_y2, 0] -= self.offset_x
-        self.state[crossed_y2, 1] = self.bounds[2]
-
-    def lebc_offset(self, dt):
+    def lebc_particle_offset(self, dt):
         L_y = self.size_y
         n = 1
         self.offset_x = self.shear_rate * dt * L_y
@@ -116,12 +103,12 @@ class ParticleBox:
             n += 1
             self.offset_x = self.shear_rate * dt * L_y - n * L_y
 
-    def force_noise(self, thermal_energy, drag_coef, timestep):
+    def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
         mag = np.sqrt(24 * thermal_energy * drag_coef / timestep)
         return mag * (np.random.random(self.state[:, :2].shape) - 0.5)
 
-    def force_shear_x(self, drag_coef):
+    def shear_force(self, drag_coef):
         """From Ridley thesis p51."""
         force = (
             self.shear_rate
@@ -131,32 +118,23 @@ class ParticleBox:
         )
         return np.column_stack((force, np.zeros(self.state.shape[0])))
 
+    def step(self):
+        n = self.thermal_noise(conf["KT"], conf["mu"], conf["dt"])
+        r_new = self.state[:, :2] + (conf["dt"] / conf["mu"]) * n
+        self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
+        self.state[:, :2] = r_new
+
+        self.crossed_boundary()
+        self.update_ghosts()
+        self.write_traj()
+        self.step_count += 1
+
     def write_traj(self):
         if self.step_count <= conf["Nsteps"]:
             with open(conf["traj_file"], "a") as f:
                 for i in range(conf["Npart"]):
                     traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e}\n"
                     f.write(traj_string)
-
-    def step(self):
-        noise = self.force_noise(conf["KT"], conf["mu"], conf["dt"])
-        shear = self.force_shear_x(conf["mu"])
-
-        # for i in range(conf["Npart"]):
-        #     print(
-        #         f"F_noise = ({noise[i,0]/1e-9: .2e}, {noise[i,1]/1e-9: .2e})  F_shear = ({shear[i,0]/1e-9: .2e}, {shear[i,1]/1e-9: .2e}) [nN]"
-        #     )
-        # print()
-
-        r_new = self.state[:, :2] + (conf["dt"] / conf["mu"]) * (noise + shear)
-        self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
-        self.state[:, :2] = r_new
-
-        self.update_ghosts()
-        self.boundary_func()
-
-        self.write_traj()
-        self.step_count += 1
 
 
 # ------------------------------------------------------------
