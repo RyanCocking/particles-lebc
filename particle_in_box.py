@@ -58,6 +58,7 @@ class ParticleBox:
         self.shear_rate = shear_rate
         self.lebc_image_velocity_x = conf["shear_rate"] * self.size_y
         self.lebc_image_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
+        self.x = 0
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
@@ -112,14 +113,13 @@ class ParticleBox:
         self.state[crossed_y1, 0] += self.lebc_image_offset_x
         self.state[crossed_y2, 0] -= self.lebc_image_offset_x
 
-    def lebc_offset(self, xin, dt):
-        x = xin
+    def lebc_offset(self, x):
         if x >= box.size_x / 2:
             x -= box.size_x
         else:
-            x += self.lebc_image_velocity_x * dt
+            x += self.lebc_image_velocity_x * conf["dt"]
 
-        return x
+        self.x = x
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
@@ -159,6 +159,7 @@ class ParticleBox:
         self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
         self.state[:, :2] = r_new
 
+        self.lebc_offset((self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2)
         self.crossed_boundary()
         self.update_ghosts()
         self.write_traj()
@@ -170,7 +171,7 @@ class ParticleBox:
                 for i in range(conf["Npart"]):
                     m1 = (self.bounds[0] + self.bounds[1]) / 2
                     m2 = (self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2
-                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.lebc_image_offset_x},{m2-m1:e}\n"
+                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.x},{m2-m1:e}\n"
                     f.write(traj_string)
 
 
@@ -354,10 +355,10 @@ t = conf["dt"] * steps
 plt.title("LEBC offset")
 plt.ylabel("$x_{LE}$ [m]")
 plt.xlabel("Steps")
-plt.plot(steps, xlei, "b-", label="Calculated")
-plt.plot(steps, mi, "r-", label="Expected")
-plt.plot([0, steps[-1]], [box.bounds[1], box.bounds[1]], "k:")
-plt.plot([0, steps[-1]], [box.bounds[0], box.bounds[0]], "k:")
+plt.plot(steps, mi, "r-", label="Expected", alpha=0.5, lw=6)
+plt.plot(steps, xlei, "g-", label="Calculated", lw=2)
+plt.plot([0, steps[-1]], [box.bounds[1], box.bounds[1]], "k:", lw=1)
+plt.plot([0, steps[-1]], [box.bounds[0], box.bounds[0]], "k:", lw=1)
 plt.plot(
     [
         box.bounds[1] / (box.lebc_image_velocity_x * conf["dt"]),
@@ -365,6 +366,7 @@ plt.plot(
     ],
     [box.bounds[0] * 1.2, box.bounds[1] * 1.2],
     "k:",
+    lw=1,
 )
 plt.legend()
 plt.show()
