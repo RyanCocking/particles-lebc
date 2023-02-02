@@ -168,7 +168,9 @@ class ParticleBox:
         if self.step_count <= conf["Nsteps"]:
             with open(conf["traj_file"], "a") as f:
                 for i in range(conf["Npart"]):
-                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.lebc_image_offset_x:e}\n"
+                    m1 = (self.bounds[0] + self.bounds[1]) / 2
+                    m2 = (self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2
+                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.lebc_image_offset_x},{m2-m1:e}\n"
                     f.write(traj_string)
 
 
@@ -312,11 +314,13 @@ traj = np.loadtxt(conf["traj_file"], delimiter=",", dtype=np.float64)
 x = traj[:, 0]
 y = traj[:, 1]
 vx = traj[:, 2]
-xle = traj[:, 4]
+xle = traj[:, -2]
+m = traj[:, -1]
 for i in range(conf["Npart"]):
     vxi = vx[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
     xlei = xle[i :: conf["Npart"]]
+    mi = m[i :: conf["Npart"]]
     # print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
     plt.plot(vxi, yi, "o", ms=2)
 
@@ -350,7 +354,8 @@ t = conf["dt"] * steps
 plt.title("LEBC offset")
 plt.ylabel("$x_{LE}$ [m]")
 plt.xlabel("Steps")
-plt.plot(steps, xlei)
+plt.plot(steps, xlei, "b-", label="Calculated")
+plt.plot(steps, mi, "r-", label="Expected")
 plt.plot([0, steps[-1]], [box.bounds[1], box.bounds[1]], "k:")
 plt.plot([0, steps[-1]], [box.bounds[0], box.bounds[0]], "k:")
 plt.plot(
@@ -358,7 +363,8 @@ plt.plot(
         box.bounds[1] / (box.lebc_image_velocity_x * conf["dt"]),
         box.bounds[1] / (box.lebc_image_velocity_x * conf["dt"]),
     ],
-    [box.bounds[0], box.bounds[1]],
+    [box.bounds[0] * 1.2, box.bounds[1] * 1.2],
     "k:",
 )
+plt.legend()
 plt.show()
