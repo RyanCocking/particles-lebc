@@ -56,7 +56,8 @@ class ParticleBox:
         self.size_x = bounds[1] - bounds[0]
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
-        self.lebc_max_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
+        self.lebc_image_velocity_x = conf["shear_rate"] * self.size_y
+        self.lebc_image_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
@@ -81,8 +82,8 @@ class ParticleBox:
         self.ghost_pos[:, :, 0] += np.mean(self.ghost_bounds[:, np.newaxis, :2], axis=2)
         self.ghost_pos[:, :, 1] += np.mean(self.ghost_bounds[:, np.newaxis, 2:], axis=2)
 
-        self.ghost_bounds[[0, 1, 2], :2] += self.lebc_max_offset_x
-        self.ghost_bounds[[4, 5, 6], :2] -= self.lebc_max_offset_x
+        self.ghost_bounds[[0, 1, 2], :2] += self.lebc_image_offset_x
+        self.ghost_bounds[[4, 5, 6], :2] -= self.lebc_image_offset_x
 
         # cell wrapping
         if self.ghost_bounds[2, 0] > 2 * self.bounds[1]:
@@ -108,11 +109,17 @@ class ParticleBox:
         # be shifted in the positive x direction.
         # however, relative to the central box, this particle will appear
         # at the bottom, having shifted in the negative x direction
-        self.state[crossed_y1, 0] += self.lebc_max_offset_x
-        self.state[crossed_y2, 0] -= self.lebc_max_offset_x
+        self.state[crossed_y1, 0] += self.lebc_image_offset_x
+        self.state[crossed_y2, 0] -= self.lebc_image_offset_x
 
-    def lebc_modified_velocity(self):
-        pass
+    def lebc_offset(self, xin, dt):
+        x = xin
+        if x >= box.size_x / 2:
+            x -= box.size_x
+        else:
+            x += self.lebc_image_velocity_x * dt
+
+        return x
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
@@ -161,7 +168,7 @@ class ParticleBox:
         if self.step_count <= conf["Nsteps"]:
             with open(conf["traj_file"], "a") as f:
                 for i in range(conf["Npart"]):
-                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e}\n"
+                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.lebc_image_offset_x:e}\n"
                     f.write(traj_string)
 
 
@@ -190,7 +197,7 @@ box = ParticleBox(
     ],
 )
 
-print(f"Max LEBC offset = {box.lebc_max_offset_x:.2e} m")
+print(f"LEBC image velocity = {box.lebc_image_velocity_x:.2e} m")
 
 print("Done")
 # ------------------------------------------------------------
@@ -305,9 +312,11 @@ traj = np.loadtxt(conf["traj_file"], delimiter=",", dtype=np.float64)
 x = traj[:, 0]
 y = traj[:, 1]
 vx = traj[:, 2]
+xle = traj[:, 4]
 for i in range(conf["Npart"]):
     vxi = vx[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
+    xlei = xle[i :: conf["Npart"]]
     # print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
     plt.plot(vxi, yi, "o", ms=2)
 
@@ -333,4 +342,23 @@ plt.xlabel("x position [m]")
 plt.ylabel("y position [m]")
 plt.xlim(-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"])
 plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.show()
+plt.close()
+
+steps = np.arange(xlei.size)
+t = conf["dt"] * steps
+plt.title("LEBC offset")
+plt.ylabel("$x_{LE}$ [m]")
+plt.xlabel("Steps")
+plt.plot(steps, xlei)
+plt.plot([0, steps[-1]], [box.bounds[1], box.bounds[1]], "k:")
+plt.plot([0, steps[-1]], [box.bounds[0], box.bounds[0]], "k:")
+plt.plot(
+    [
+        box.bounds[1] / (box.lebc_image_velocity_x * conf["dt"]),
+        box.bounds[1] / (box.lebc_image_velocity_x * conf["dt"]),
+    ],
+    [box.bounds[0], box.bounds[1]],
+    "k:",
+)
 plt.show()
