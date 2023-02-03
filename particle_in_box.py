@@ -59,6 +59,16 @@ class ParticleBox:
         self.lebc_image_velocity_x = conf["shear_rate"] * self.size_y
         self.lebc_image_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
         self.x = 0
+        self.image_matrix = [
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [1, -1],
+            [0, -1],
+            [-1, -1],
+            [-1, 0],
+        ]
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
         self.ghost_bounds = np.repeat(self.bounds[np.newaxis, :], 8, axis=0)
@@ -66,15 +76,11 @@ class ParticleBox:
         # A better idea might be to have an origin vector that represents the
         # bottom left corner of each box, then we just store one
         # set of coordinates and transform it eight times [JM Haile, p82].
-        self.ghost_bounds[[2, 3, 4], :2] += self.size_x  # right
-        self.ghost_bounds[[6, 7, 0], :2] -= self.size_x  # left
-        self.ghost_bounds[[0, 1, 2], 2:] += self.size_y  # top
-        self.ghost_bounds[[4, 5, 6], 2:] -= self.size_y  # bottom
-
-        self.ghost_pos[[2, 3, 4], :, 0] += self.size_x
-        self.ghost_pos[[6, 7, 0], :, 0] -= self.size_x
-        self.ghost_pos[[0, 1, 2], :, 1] += self.size_y
-        self.ghost_pos[[4, 5, 6], :, 1] -= self.size_y
+        for i, img in enumerate(self.image_matrix):
+            self.ghost_bounds[i, :2] += img[0] * self.size_x
+            self.ghost_bounds[i, 2:] += img[1] * self.size_y
+            self.ghost_pos[i, :, 0] += img[0] * self.size_x
+            self.ghost_pos[i, :, 1] += img[1] * self.size_x
 
     def update_ghosts(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
