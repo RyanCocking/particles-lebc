@@ -82,13 +82,14 @@ class ParticleBox:
             self.ghost_pos[i, :, 0] += img[0] * self.size_x
             self.ghost_pos[i, :, 1] += img[1] * self.size_x
 
-    def update_ghosts(self):
+    def update_image_particles(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
 
-        # move particles into ghost cells, shifting by cell midpoints
+        # move particles into cells, shifting by cell midpoints
         self.ghost_pos[:, :, 0] += np.mean(self.ghost_bounds[:, np.newaxis, :2], axis=2)
         self.ghost_pos[:, :, 1] += np.mean(self.ghost_bounds[:, np.newaxis, 2:], axis=2)
 
+    def update_image_bounds(self):
         self.ghost_bounds[[0, 1, 2], :2] += self.lebc_image_offset_x
         self.ghost_bounds[[4, 5, 6], :2] -= self.lebc_image_offset_x
 
@@ -120,8 +121,8 @@ class ParticleBox:
         self.state[crossed_y2, 0] -= self.lebc_image_offset_x
 
     def lebc_offset(self, x):
-        if x >= box.size_x / 2:
-            x -= box.size_x
+        if x >= self.size_x / 2:
+            x -= self.size_x
         else:
             x += self.lebc_image_velocity_x * conf["dt"]
 
@@ -136,7 +137,7 @@ class ParticleBox:
         """y coordinate should be in range 0 < y < L. See Ridley p51, Bindgen et al, Lees & Edwards"""
         force = (
             self.shear_rate
-            * box.size_y
+            * self.size_y
             * drag_coef
             * ((self.state[:, 1] + 0.5 * box.size_y) / box.size_y - 0.5)
         )
@@ -166,8 +167,10 @@ class ParticleBox:
         self.state[:, :2] = r_new
 
         self.lebc_offset((self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2)
+
         self.crossed_boundary()
-        self.update_ghosts()
+        self.update_image_particles()
+        self.update_image_bounds()
         self.write_traj()
         self.step_count += 1
 
