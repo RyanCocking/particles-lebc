@@ -102,6 +102,7 @@ class ParticleBox:
 
     def crossed_boundary(self):
         # check for crossing boundary
+        # separate these out - prevent crossing two boundaries simultaneously (corner artifact)
         crossed_x1 = self.state[:, 0] < self.bounds[0]  # left
         crossed_x2 = self.state[:, 0] > self.bounds[1]  # right
         crossed_y1 = self.state[:, 1] < self.bounds[2]  # bottom
@@ -121,6 +122,7 @@ class ParticleBox:
         self.state[crossed_y2, 0] -= self.x
 
     def lebc_offset(self, x):
+        # shouldn't LEBC offset happen regardless of shifting back by box length?
         if x > self.size_x / 2:
             x -= self.size_x
         else:
