@@ -125,8 +125,8 @@ class ParticleBox:
         # shouldn't LEBC offset happen regardless of shifting back by box length?
         if x > self.size_x / 2:
             x -= self.size_x
-        else:
-            x += self.lebc_image_velocity_x * conf["dt"]
+
+        x += self.lebc_image_velocity_x * conf["dt"]
 
         self.x = x
 
