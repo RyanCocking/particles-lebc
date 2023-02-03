@@ -241,7 +241,7 @@ ghost_rect = [
         fc="none",
         ls="-",
     )
-    for gb in box.ghost_bounds
+    for gb in box.ghost_bounds[[1, 5]]
 ]
 
 ax.add_patch(rect)
@@ -276,12 +276,12 @@ def animate(i):
     for item in ghost_rect:
         item.set_edgecolor("k")
 
-    for gr, gb in zip(ghost_rect, box.ghost_bounds):
+    for gr, gb in zip(ghost_rect, box.ghost_bounds[[1, 5]]):
         gr.xy = gb[::2]
 
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
-    images.set_data(box.ghost_pos[:, :, 0], box.ghost_pos[:, :, 1])
+    images.set_data(box.ghost_pos[[1, 5], :, 0], box.ghost_pos[[1, 5], :, 1])
     images.set_markersize(ms)
 
     return (particles, images, *ghost_rect, rect)
