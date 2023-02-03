@@ -288,6 +288,8 @@ def animate(i):
     for gr, gb in zip(ghost_rect, box.ghost_bounds[[1, 5]]):
         gr.xy = gb[::2]
 
+    plt.title(f"$x_{{LE}}$ = {box.x:.3e}")
+
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[[1, 5], :, 0], box.ghost_pos[[1, 5], :, 1])
