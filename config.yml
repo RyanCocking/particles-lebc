@@ -1,9 +1,10 @@
 traj_file: "traj.csv"
 save_video: False
-Nsteps: 1000
-fps: 1
+draw_all: True
+Nsteps: 500
+fps: 20
 Npart: 50
-shear_rate:  1e7   # artery [s^-1]
+shear_rate:  2e7   # artery [s^-1]
 dt: 2.0e-10         # [s]
 
 enable_noise: False

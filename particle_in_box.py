@@ -117,11 +117,11 @@ class ParticleBox:
         # be shifted in the positive x direction.
         # however, relative to the central box, this particle will appear
         # at the bottom, having shifted in the negative x direction
-        self.state[crossed_y1, 0] += self.lebc_image_offset_x
-        self.state[crossed_y2, 0] -= self.lebc_image_offset_x
+        self.state[crossed_y1, 0] += self.x
+        self.state[crossed_y2, 0] -= self.x
 
     def lebc_offset(self, x):
-        if x >= self.size_x / 2:
+        if x > self.size_x / 2:
             x -= self.size_x
         else:
             x += self.lebc_image_velocity_x * conf["dt"]
@@ -231,6 +231,11 @@ ax = fig.add_subplot(
 # images of the periodic copies
 (images,) = ax.plot([], [], "co", ms=6)
 
+if conf["draw_all"]:
+    ind = list(range(8))
+else:
+    ind = [1, 5]
+
 rect = plt.Rectangle(
     box.bounds[::2],
     box.size_x,
@@ -250,7 +255,7 @@ ghost_rect = [
         fc="none",
         ls="-",
     )
-    for gb in box.ghost_bounds[[1, 5]]
+    for gb in box.ghost_bounds[ind]
 ]
 
 ax.add_patch(rect)
@@ -285,14 +290,14 @@ def animate(i):
     for item in ghost_rect:
         item.set_edgecolor("k")
 
-    for gr, gb in zip(ghost_rect, box.ghost_bounds[[1, 5]]):
+    for gr, gb in zip(ghost_rect, box.ghost_bounds[ind]):
         gr.xy = gb[::2]
 
     plt.title(f"$x_{{LE}}$ = {box.x:.3e}")
 
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
-    images.set_data(box.ghost_pos[[1, 5], :, 0], box.ghost_pos[[1, 5], :, 1])
+    images.set_data(box.ghost_pos[ind, :, 0], box.ghost_pos[ind, :, 1])
     images.set_markersize(ms)
 
     return (particles, images, *ghost_rect, rect)
