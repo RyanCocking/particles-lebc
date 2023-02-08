@@ -82,6 +82,17 @@ class ParticleBox:
             self.ghost_pos[i, :, 0] += img[0] * self.size_x
             self.ghost_pos[i, :, 1] += img[1] * self.size_x
 
+    def box_query(self, part_ind):
+        xy = self.state[part_ind, :2]
+
+        # if xy within self.bounds
+        #   return [0, 0]
+        # else if xy within self.ghost_bounds[i]
+        # return self.image_matrix[i]
+        # exception: multiple boxes returned
+        # raise warning
+        pass
+
     def update_image_particles(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
 
@@ -107,6 +118,18 @@ class ParticleBox:
         crossed_x2 = self.state[:, 0] > self.bounds[1]  # right
         crossed_y1 = self.state[:, 1] < self.bounds[2]  # bottom
         crossed_y2 = self.state[:, 1] > self.bounds[3]  # top
+
+        # simultaneous bounds check
+        for i in range(self.state.shape[0]):
+            if crossed_x1[i] and crossed_x2[i]:
+                raise Exception(
+                    f"Particle {i} crossed left and right (x) boundaries simultaneously."
+                )
+
+            elif crossed_y1[i] and crossed_y2[i]:
+                raise Exception(
+                    f"Particle {i} crossed upper and lower (y) boundaries simultaneously."
+                )
 
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
