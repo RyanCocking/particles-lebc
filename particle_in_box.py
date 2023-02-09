@@ -112,15 +112,21 @@ class ParticleBox:
             self.ghost_pos[i, :, 1] += img[1] * self.size_x
 
     def box_query(self, part_ind):
+        """Return the image occupied by a particle of a given index"""
         xy = self.state[part_ind, :2]
 
         if point_within_rectangle(xy, self.bounds):
             return self.image_matrix[-1]
-        # else if xy within self.ghost_bounds[i]
-        # return self.image_matrix[i]
-        # exception: multiple boxes returned
-        # raise warning
-        pass
+        else:
+            ind = np.zeros(self.ghost_bounds.size, dtype=bool)
+            for i, gb in enumerate(self.ghost_bounds):
+                ind[i] = point_within_rectangle(xy, gb)
+
+            if sum(ind) > 1:
+                print(self.image_matrix[np.where(ind)])
+                raise Exception("Particle occupied two images simultaneously")
+
+            return self.image_matrix[ind][0]
 
     def update_image_particles(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
