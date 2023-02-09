@@ -111,7 +111,7 @@ class ParticleBox:
             self.ghost_pos[i, :, 0] += img[0] * self.size_x
             self.ghost_pos[i, :, 1] += img[1] * self.size_x
 
-    def box_query(self, part_ind):
+    def image_query(self, part_ind):
         """Return the image occupied by a particle of a given index"""
         xy = self.state[part_ind, :2]
 
