@@ -30,6 +30,34 @@ if p.is_file():
     p.unlink()
 
 
+def point_within_rectangle(
+    m=np.array([0.5, 0.5]), rect=np.array([[-1, 1], [1, 1], [1, -1], [-1, -1]])
+):
+    """https://math.stackexchange.com/questions/190111/how-to-check-if-a-point-is-inside-a-rectangle"""
+
+    if rect.shape == (4, 2):
+        # rect passed as corners
+        a, b, _, d = rect
+    elif rect.shape == (4,):
+        # rect passed as box bounds
+        xmin, xmax, ymin, ymax = rect
+        a = np.array([xmin, ymax])
+        b = np.array([xmax, ymax])
+        d = np.array([xmin, ymin])
+    else:
+        raise Exception(f"rect has invalid shape: {rect.shape}")
+
+    am = m - a
+    ab = b - a
+    ad = d - a
+    amab = np.dot(am, ab)
+    abab = np.dot(ab, ab)
+    amad = np.dot(am, ad)
+    adad = np.dot(ad, ad)
+
+    return (0 < amab < abab) and (0 < amad < adad)
+
+
 class ParticleBox:
     """Orbits class
 
@@ -68,6 +96,7 @@ class ParticleBox:
             [0, -1],
             [-1, -1],
             [-1, 0],
+            [0, 0],
         ]
 
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
@@ -76,7 +105,7 @@ class ParticleBox:
         # A better idea might be to have an origin vector that represents the
         # bottom left corner of each box, then we just store one
         # set of coordinates and transform it eight times [JM Haile, p82].
-        for i, img in enumerate(self.image_matrix):
+        for i, img in enumerate(self.image_matrix[:-1]):
             self.ghost_bounds[i, :2] += img[0] * self.size_x
             self.ghost_bounds[i, 2:] += img[1] * self.size_y
             self.ghost_pos[i, :, 0] += img[0] * self.size_x
@@ -85,8 +114,8 @@ class ParticleBox:
     def box_query(self, part_ind):
         xy = self.state[part_ind, :2]
 
-        # if xy within self.bounds
-        #   return [0, 0]
+        if point_within_rectangle(xy, self.bounds):
+            return self.image_matrix[-1]
         # else if xy within self.ghost_bounds[i]
         # return self.image_matrix[i]
         # exception: multiple boxes returned
