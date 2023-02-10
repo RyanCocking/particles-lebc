@@ -124,8 +124,12 @@ class ParticleBox:
             if sum(ind) > 1:
                 print(self.image_matrix[np.where(ind)])
                 raise Exception("Particle occupied two images simultaneously")
+            elif sum(ind) == 0:
+                return None
 
-            return self.image_matrix[ind][0]
+            i = ind.nonzero()[0][0]
+            print(f"Particle entered bounds of image {self.image_matrix[i]}")
+            return self.image_matrix[i]
 
     def update_image_particles(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
@@ -186,11 +190,7 @@ class ParticleBox:
         self.state[crossed_y1, 1] = self.bounds[3]
         self.state[crossed_y2, 1] = self.bounds[2]
 
-        # crossing the upper or lower boundary requires an offset in x
-        # e.g. if a particle passes thrtough the upper boundary, its image should
-        # be shifted in the positive x direction.
-        # however, relative to the central box, this particle will appear
-        # at the bottom, having shifted in the negative x direction
+        self.image_query([0])
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
