@@ -85,8 +85,7 @@ class ParticleBox:
         self.size_y = bounds[3] - bounds[2]
         self.shear_rate = shear_rate
         self.lebc_image_velocity_x = conf["shear_rate"] * self.size_y
-        self.lebc_image_offset_x = conf["shear_rate"] * self.size_y * conf["dt"]
-        self.x = 0
+        self.lebc_image_offset_x = 0
         self.image_matrix = [
             [-1, 1],
             [0, 1],
@@ -136,15 +135,26 @@ class ParticleBox:
         self.ghost_pos[:, :, 1] += np.mean(self.ghost_bounds[:, np.newaxis, 2:], axis=2)
 
     def update_image_bounds(self):
-        self.ghost_bounds[[0, 1, 2], :2] += self.lebc_image_offset_x
-        self.ghost_bounds[[4, 5, 6], :2] -= self.lebc_image_offset_x
+        for i, img in enumerate(self.image_matrix[:-1]):
+            self.ghost_bounds[i, 0] = (
+                self.bounds[0]
+                + self.lebc_image_offset_x * img[1]
+                + self.size_x * img[0]
+            )
+            self.ghost_bounds[i, 1] = (
+                self.bounds[1]
+                + self.lebc_image_offset_x * img[1]
+                + self.size_x * img[0]
+            )
+            self.ghost_bounds[i, 2] = self.bounds[2] + self.size_y * img[1]
+            self.ghost_bounds[i, 3] = self.bounds[3] + self.size_y * img[1]
 
-        # cell wrapping
-        if self.ghost_bounds[2, 0] > 2 * self.bounds[1]:
-            self.ghost_bounds[[0, 1, 2], :2] -= self.size_x
+    def set_lebc_offset(self):
+        # shouldn't LEBC offset happen regardless of shifting back by box length?
+        if self.lebc_image_offset_x > self.bounds[1]:
+            self.lebc_image_offset_x -= self.size_x
 
-        if self.ghost_bounds[6, 1] < 2 * self.bounds[0]:
-            self.ghost_bounds[[4, 5, 6], :2] += self.size_x
+        self.lebc_image_offset_x += self.lebc_image_velocity_x * conf["dt"]
 
     def crossed_boundary(self):
         # check for crossing boundary
@@ -166,6 +176,11 @@ class ParticleBox:
                     f"Particle {i} crossed upper and lower (y) boundaries simultaneously."
                 )
 
+        self.set_lebc_offset()
+
+        self.state[crossed_y1, 0] += self.lebc_image_offset_x
+        self.state[crossed_y2, 0] -= self.lebc_image_offset_x
+
         self.state[crossed_x1, 0] = self.bounds[1]
         self.state[crossed_x2, 0] = self.bounds[0]
         self.state[crossed_y1, 1] = self.bounds[3]
@@ -176,17 +191,6 @@ class ParticleBox:
         # be shifted in the positive x direction.
         # however, relative to the central box, this particle will appear
         # at the bottom, having shifted in the negative x direction
-        self.state[crossed_y1, 0] += self.x
-        self.state[crossed_y2, 0] -= self.x
-
-    def lebc_offset(self, x):
-        # shouldn't LEBC offset happen regardless of shifting back by box length?
-        if x > self.size_x / 2:
-            x -= self.size_x
-
-        x += self.lebc_image_velocity_x * conf["dt"]
-
-        self.x = x
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
@@ -226,8 +230,6 @@ class ParticleBox:
         self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
         self.state[:, :2] = r_new
 
-        self.lebc_offset((self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2)
-
         self.crossed_boundary()
         self.update_image_particles()
         self.update_image_bounds()
@@ -240,7 +242,7 @@ class ParticleBox:
                 for i in range(conf["Npart"]):
                     m1 = (self.bounds[0] + self.bounds[1]) / 2
                     m2 = (self.ghost_bounds[1, 0] + self.ghost_bounds[1, 1]) / 2
-                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.x},{m2-m1:e}\n"
+                    traj_string = f"{self.state[i, 0]:e},{self.state[i, 1]:e},{self.state[i, 2]:e},{self.state[i, 3]:e},{self.lebc_image_offset_x},{m2-m1:e}\n"
                     f.write(traj_string)
 
 
@@ -353,7 +355,7 @@ def animate(i):
     for gr, gb in zip(ghost_rect, box.ghost_bounds[ind]):
         gr.xy = gb[::2]
 
-    plt.title(f"$x_{{LE}}$ = {box.x:.3e}")
+    plt.title(f"$x_{{LE}}$ = {box.lebc_image_offset_x:.3e}")
 
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
