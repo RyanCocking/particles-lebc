@@ -180,8 +180,6 @@ class ParticleBox:
                     f"Particle {i} crossed upper and lower (y) boundaries simultaneously."
                 )
 
-        self.set_lebc_offset()
-
         self.state[crossed_y1, 0] += self.lebc_image_offset_x
         self.state[crossed_y2, 0] -= self.lebc_image_offset_x
 
@@ -230,6 +228,7 @@ class ParticleBox:
         self.state[:, 2:] = (r_new - self.state[:, :2]) / conf["dt"]
         self.state[:, :2] = r_new
 
+        self.set_lebc_offset()
         self.crossed_boundary()
         self.update_image_particles()
         self.update_image_bounds()
