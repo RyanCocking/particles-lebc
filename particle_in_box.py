@@ -394,6 +394,7 @@ vx = traj[:, 2]
 xle = traj[:, -2]
 m = traj[:, -1]
 for i in range(conf["Npart"]):
+    # place in loop to colour plot by particles
     vxi = vx[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
     xlei = xle[i :: conf["Npart"]]
@@ -401,16 +402,18 @@ for i in range(conf["Npart"]):
     # print(f"<y{i:d}> = {np.mean(yi) - yi[0]:.2e}, <vx{i:d}> = {np.mean(vxi):.2e}")
     plt.plot(vxi, yi, "o", ms=2)
 
+plt.title("Instantaneous velocity")
 plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
 plt.plot([-np.max(vx), np.max(vx)], [0, 0], "k:")
-plt.title("Instantaneous velocity profile")
 plt.xlabel("x velocity [m/s]")
 plt.ylabel("y position [m]")
 plt.xlim(-np.max(vx), np.max(vx))
 plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.savefig("instantaneous_velocity.png", dpi=400)
 plt.show()
 plt.close()
 
+plt.title("Trajectory")
 for i in range(conf["Npart"]):
     xi = x[i :: conf["Npart"]]
     yi = y[i :: conf["Npart"]]
@@ -418,17 +421,17 @@ for i in range(conf["Npart"]):
 
 plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
 plt.plot([-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"]], [0, 0], "k:")
-plt.title("Trajectory")
 plt.xlabel("x position [m]")
 plt.ylabel("y position [m]")
 plt.xlim(-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"])
 plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.savefig("trajectory.png", dpi=400)
 plt.show()
 plt.close()
 
+plt.title("LEBC offset")
 steps = np.arange(xlei.size)
 t = conf["dt"] * steps
-plt.title("LEBC offset")
 plt.ylabel("$x_{LE}$ [m]")
 plt.xlabel("Steps")
 plt.plot(steps, mi, "r-", label="Expected", alpha=0.5, lw=6)
@@ -445,4 +448,40 @@ plt.plot(
     lw=1,
 )
 plt.legend()
+plt.savefig("lebc_offset.png", dpi=400)
+plt.show()
+plt.close()
+
+plt.title("Displacement")
+xi = x[0 :: conf["Npart"]]
+yi = y[0 :: conf["Npart"]]
+
+dxisum = np.zeros(xi.shape)
+dyisum = np.zeros(yi.shape)
+for i in range(conf["Npart"]):
+    dxisum += x[i :: conf["Npart"]] - x[i :: conf["Npart"]][0]
+    dyisum += y[i :: conf["Npart"]] - y[i :: conf["Npart"]][0]
+
+dxi = xi - xi[0]
+dyi = yi - yi[0]
+plt.plot(steps, dxi, "b-", label="x [particle 0]")
+plt.plot(steps, dyi, "r-", label="y [particle 0]")
+# plt.plot(steps, dxisum / conf["Npart"], "c-", label="x mean")
+# plt.plot(steps, dyisum / conf["Npart"], "m-", label="y mean")
+plt.plot([steps[0], steps[-1]], [0, 0], "k:", lw=1)
+plt.plot(
+    [steps[0], steps[-1]],
+    [conf["box_size_x"], conf["box_size_x"]],
+    "k:",
+    lw=1,
+)
+plt.plot(
+    [steps[0], steps[-1]],
+    [-conf["box_size_x"], -conf["box_size_x"]],
+    "k:",
+    lw=1,
+)
+
+plt.legend()
+plt.savefig("displacement.png", dpi=400)
 plt.show()
