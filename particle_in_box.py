@@ -452,7 +452,7 @@ plt.savefig("lebc_offset.png", dpi=400)
 plt.show()
 plt.close()
 
-plt.title("Displacement")
+plt.title("Displacement from spawn point")
 xi = x[0 :: conf["Npart"]]
 yi = y[0 :: conf["Npart"]]
 
@@ -483,5 +483,39 @@ plt.plot(
 )
 
 plt.legend()
-plt.savefig("displacement.png", dpi=400)
+plt.savefig("displacement_spawn.png", dpi=400)
+plt.show()
+
+plt.title("Displacement from box centre")
+xi = x[0 :: conf["Npart"]]
+yi = y[0 :: conf["Npart"]]
+
+dxisum = np.zeros(xi.shape)
+dyisum = np.zeros(yi.shape)
+for i in range(conf["Npart"]):
+    dxisum += x[i :: conf["Npart"]]
+    dyisum += y[i :: conf["Npart"]]
+
+dxi = xi
+dyi = yi
+plt.plot(steps, dxi, "b-", label="x [particle 0]")
+plt.plot(steps, dyi, "r-", label="y [particle 0]")
+# plt.plot(steps, dxisum / conf["Npart"], "c-", label="x mean")
+# plt.plot(steps, dyisum / conf["Npart"], "m-", label="y mean")
+plt.plot([steps[0], steps[-1]], [0, 0], "k:", lw=1)
+plt.plot(
+    [steps[0], steps[-1]],
+    [conf["box_size_x"], conf["box_size_x"]],
+    "k:",
+    lw=1,
+)
+plt.plot(
+    [steps[0], steps[-1]],
+    [-conf["box_size_x"], -conf["box_size_x"]],
+    "k:",
+    lw=1,
+)
+
+plt.legend()
+plt.savefig("displacement_box_centre.png", dpi=400)
 plt.show()
