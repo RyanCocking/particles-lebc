@@ -151,8 +151,8 @@ class ParticleBox:
 
     def set_lebc_offset(self):
         # shouldn't LEBC offset happen regardless of shifting back by box length?
-        if self.lebc_image_offset_x > self.bounds[1]:
-            self.lebc_image_offset_x -= self.size_x
+        if self.lebc_image_offset_x >= self.bounds[1]:
+            self.lebc_image_offset_x = self.bounds[0]
 
         self.lebc_image_offset_x += self.lebc_image_velocity_x * conf["dt"]
 
@@ -293,6 +293,8 @@ ax = fig.add_subplot(
 # images of the periodic copies
 (images,) = ax.plot([], [], "co", ms=6)
 
+(arrow,) = ax.plot([], [], "r-", lw=2)
+
 if conf["draw_all"]:
     ind = list(range(8))
 else:
@@ -331,10 +333,11 @@ def init():
     """initialize animation"""
     particles.set_data([], [])
     images.set_data([], [])
+    arrow.set_data([], [])
     rect.set_edgecolor("r")
     for item in ghost_rect:
         item.set_edgecolor("k")
-    return (particles, rect, images, *ghost_rect)
+    return (particles, rect, images, *ghost_rect, arrow)
 
 
 def animate(i):
@@ -356,13 +359,22 @@ def animate(i):
         gr.xy = gb[::2]
 
     plt.title(f"$x_{{LE}}$ = {box.lebc_image_offset_x:.3e}")
+    plt.plot(
+        [0, box.lebc_image_offset_x],
+        [0.25 * conf["box_size_x"], 0.25 * conf["box_size_x"]],
+        "k-",
+    )
 
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[ind, :, 0], box.ghost_pos[ind, :, 1])
     images.set_markersize(ms)
+    arrow.set_data(
+        [0, box.lebc_image_offset_x],
+        [0.25 * conf["box_size_y"], 0.25 * conf["box_size_y"]],
+    )
 
-    return (particles, images, *ghost_rect, rect)
+    return (particles, images, *ghost_rect, rect, arrow)
 
 
 ani = animation.FuncAnimation(
