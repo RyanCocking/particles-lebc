@@ -297,8 +297,6 @@ ax = fig.add_subplot(
 # images of the periodic copies
 (images,) = ax.plot([], [], "co", ms=6)
 
-(arrow,) = ax.plot([], [], "r-", lw=2)
-
 if conf["draw_all"]:
     ind = list(range(8))
 else:
@@ -337,11 +335,10 @@ def init():
     """initialize animation"""
     particles.set_data([], [])
     images.set_data([], [])
-    arrow.set_data([], [])
     rect.set_edgecolor("r")
     for item in ghost_rect:
         item.set_edgecolor("k")
-    return (particles, rect, images, *ghost_rect, arrow)
+    return (particles, rect, images, *ghost_rect)
 
 
 def animate(i):
@@ -363,22 +360,13 @@ def animate(i):
         gr.xy = gb[::2]
 
     plt.title(f"$x_{{LE}}$ = {box.lebc_image_offset_x:.3e}")
-    plt.plot(
-        [0, box.lebc_image_offset_x],
-        [0.25 * conf["box_dim"], 0.25 * conf["box_dim"]],
-        "k-",
-    )
 
     particles.set_data(box.state[:, 0], box.state[:, 1])
     particles.set_markersize(ms)
     images.set_data(box.ghost_pos[ind, :, 0], box.ghost_pos[ind, :, 1])
     images.set_markersize(ms)
-    arrow.set_data(
-        [0, box.lebc_image_offset_x],
-        [0.25 * conf["box_dim"], 0.25 * conf["box_dim"]],
-    )
 
-    return (particles, images, *ghost_rect, rect, arrow)
+    return (particles, images, *ghost_rect, rect)
 
 
 ani = animation.FuncAnimation(
