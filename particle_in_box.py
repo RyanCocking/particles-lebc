@@ -22,8 +22,7 @@ from pathlib import Path
 conf = OmegaConf.load("config.yml")
 conf["mu"] = 6.0 * np.pi * conf["eta"] * conf["part_radius"]  # [kg s^-1]
 conf["D"] = conf["KT"] / conf["mu"]  # [m^2 s^1]
-conf["box_size_x"] = 50 * conf["part_radius"]
-conf["box_size_y"] = conf["box_size_x"]
+conf["box_dim"] = 50 * conf["part_radius"]
 
 p = Path(conf["traj_file"])
 if p.is_file():
@@ -81,10 +80,9 @@ class ParticleBox:
         self.step_count = 0
         self.bounds = np.asarray(bounds)
         self.part_radius = radius
-        self.size_x = bounds[1] - bounds[0]
-        self.size_y = bounds[3] - bounds[2]
+        self.dim = bounds[1] - bounds[0]
         self.shear_rate = shear_rate
-        self.lebc_image_velocity_x = conf["shear_rate"] * self.size_y
+        self.lebc_image_velocity_x = conf["shear_rate"] * self.dim
         self.lebc_image_offset_x = 0
         self.image_matrix = [
             [-1, 1],
@@ -105,10 +103,10 @@ class ParticleBox:
         # bottom left corner of each box, then we just store one
         # set of coordinates and transform it eight times [JM Haile, p82].
         for i, img in enumerate(self.image_matrix[:-1]):
-            self.ghost_bounds[i, :2] += img[0] * self.size_x
-            self.ghost_bounds[i, 2:] += img[1] * self.size_y
-            self.ghost_pos[i, :, 0] += img[0] * self.size_x
-            self.ghost_pos[i, :, 1] += img[1] * self.size_x
+            self.ghost_bounds[i, :2] += img[0] * self.dim
+            self.ghost_bounds[i, 2:] += img[1] * self.dim
+            self.ghost_pos[i, :, 0] += img[0] * self.dim
+            self.ghost_pos[i, :, 1] += img[1] * self.dim
 
     def image_query(self, part_ind):
         """Return the image occupied by a particle of a given index"""
@@ -141,17 +139,13 @@ class ParticleBox:
     def update_image_bounds(self):
         for i, img in enumerate(self.image_matrix[:-1]):
             self.ghost_bounds[i, 0] = (
-                self.bounds[0]
-                + self.lebc_image_offset_x * img[1]
-                + self.size_x * img[0]
+                self.bounds[0] + self.lebc_image_offset_x * img[1] + self.dim * img[0]
             )
             self.ghost_bounds[i, 1] = (
-                self.bounds[1]
-                + self.lebc_image_offset_x * img[1]
-                + self.size_x * img[0]
+                self.bounds[1] + self.lebc_image_offset_x * img[1] + self.dim * img[0]
             )
-            self.ghost_bounds[i, 2] = self.bounds[2] + self.size_y * img[1]
-            self.ghost_bounds[i, 3] = self.bounds[3] + self.size_y * img[1]
+            self.ghost_bounds[i, 2] = self.bounds[2] + self.dim * img[1]
+            self.ghost_bounds[i, 3] = self.bounds[3] + self.dim * img[1]
 
     def set_lebc_offset(self):
         # shouldn't LEBC offset happen regardless of shifting back by box length?
@@ -162,33 +156,44 @@ class ParticleBox:
 
     def crossed_boundary(self):
         # check for crossing boundary
-        # separate these out - prevent crossing two boundaries simultaneously (corner artifact)
-        crossed_x1 = self.state[:, 0] < self.bounds[0]  # left
-        crossed_x2 = self.state[:, 0] > self.bounds[1]  # right
-        crossed_y1 = self.state[:, 1] < self.bounds[2]  # bottom
-        crossed_y2 = self.state[:, 1] > self.bounds[3]  # top
+        crossed_xmin = self.state[:, 0] < self.bounds[0]  # left
+        crossed_xmax = self.state[:, 0] > self.bounds[1]  # right
+        crossed_ymin = self.state[:, 1] < self.bounds[2]  # bottom
+        crossed_ymax = self.state[:, 1] > self.bounds[3]  # top
 
         # simultaneous bounds check
         for i in range(self.state.shape[0]):
-            if crossed_x1[i] and crossed_x2[i]:
+            if crossed_xmin[i] and crossed_xmax[i]:
                 raise Exception(
                     f"Particle {i} crossed left and right (x) boundaries simultaneously."
                 )
 
-            elif crossed_y1[i] and crossed_y2[i]:
+            elif crossed_ymin[i] and crossed_ymax[i]:
                 raise Exception(
                     f"Particle {i} crossed upper and lower (y) boundaries simultaneously."
                 )
 
-        self.state[crossed_y1, 0] += self.lebc_image_offset_x
-        self.state[crossed_y2, 0] -= self.lebc_image_offset_x
+        self.state[crossed_ymin, 0] = (
+            np.mod(
+                self.state[crossed_ymin, 0] + self.lebc_image_offset_x + 0.5 * self.dim,
+                self.dim,
+            )
+            - 0.5 * self.dim
+        )
 
-        self.state[crossed_x1, 0] = self.bounds[1]
-        self.state[crossed_x2, 0] = self.bounds[0]
-        self.state[crossed_y1, 1] = self.bounds[3]
-        self.state[crossed_y2, 1] = self.bounds[2]
+        self.state[crossed_ymax, 0] = (
+            np.mod(
+                self.state[crossed_ymax, 0] - self.lebc_image_offset_x + 0.5 * self.dim,
+                self.dim,
+            )
+            - 0.5 * self.dim
+        )
 
-        self.image_query([0])
+        self.state[crossed_ymin, 1] += self.dim
+        self.state[crossed_ymax, 1] -= self.dim
+
+        self.state[crossed_xmin, 0] += self.dim
+        self.state[crossed_xmax, 0] -= self.dim
 
     def thermal_noise(self, thermal_energy, drag_coef, timestep):
         """From fluctuation-dissipation theorem."""
@@ -199,9 +204,9 @@ class ParticleBox:
         """y coordinate should be in range 0 < y < L. See Ridley p51, Bindgen et al, Lees & Edwards"""
         force = (
             self.shear_rate
-            * self.size_y
+            * self.dim
             * drag_coef
-            * ((self.state[:, 1] + 0.5 * box.size_y) / box.size_y - 0.5)
+            * ((self.state[:, 1] + 0.5 * box.dim) / box.dim - 0.5)
         )
         return np.column_stack((force, np.zeros(self.state.shape[0])))
 
@@ -251,7 +256,7 @@ class ParticleBox:
 np.random.seed(int(time()))
 init_state = np.zeros((conf["Npart"], 4))
 init_state[:, :2] = (np.random.random((conf["Npart"], 2)) - 0.5) * min(
-    conf["box_size_x"], conf["box_size_y"]
+    conf["box_dim"], conf["box_dim"]
 )
 init_state[:, 2:] = (
     np.random.random((conf["Npart"], 2)) * conf["part_radius"] / conf["dt"]
@@ -263,10 +268,10 @@ box = ParticleBox(
     radius=conf["part_radius"],
     shear_rate=conf["shear_rate"],
     bounds=[
-        -0.5 * conf["box_size_x"],
-        0.5 * conf["box_size_x"],
-        -0.5 * conf["box_size_y"],
-        0.5 * conf["box_size_y"],
+        -0.5 * conf["box_dim"],
+        0.5 * conf["box_dim"],
+        -0.5 * conf["box_dim"],
+        0.5 * conf["box_dim"],
     ],
 )
 
@@ -282,8 +287,8 @@ ax = fig.add_subplot(
     111,
     aspect="equal",
     autoscale_on=False,
-    xlim=(-2.3 * conf["box_size_x"], 2.3 * conf["box_size_x"]),
-    ylim=(-1.5 * conf["box_size_y"], 1.5 * conf["box_size_y"]),
+    xlim=(-2.3 * conf["box_dim"], 2.3 * conf["box_dim"]),
+    ylim=(-1.5 * conf["box_dim"], 1.5 * conf["box_dim"]),
 )
 
 # particles holds the locations of the particles
@@ -301,8 +306,8 @@ else:
 
 rect = plt.Rectangle(
     box.bounds[::2],
-    box.size_x,
-    box.size_y,
+    box.dim,
+    box.dim,
     ec="r",
     lw=2,
     fc="none",
@@ -311,8 +316,8 @@ rect = plt.Rectangle(
 ghost_rect = [
     plt.Rectangle(
         gb[::2],
-        box.size_x,
-        box.size_y,
+        box.dim,
+        box.dim,
         ec="k",
         lw=2,
         fc="none",
@@ -360,7 +365,7 @@ def animate(i):
     plt.title(f"$x_{{LE}}$ = {box.lebc_image_offset_x:.3e}")
     plt.plot(
         [0, box.lebc_image_offset_x],
-        [0.25 * conf["box_size_x"], 0.25 * conf["box_size_x"]],
+        [0.25 * conf["box_dim"], 0.25 * conf["box_dim"]],
         "k-",
     )
 
@@ -370,7 +375,7 @@ def animate(i):
     images.set_markersize(ms)
     arrow.set_data(
         [0, box.lebc_image_offset_x],
-        [0.25 * conf["box_size_y"], 0.25 * conf["box_size_y"]],
+        [0.25 * conf["box_dim"], 0.25 * conf["box_dim"]],
     )
 
     return (particles, images, *ghost_rect, rect, arrow)
@@ -416,12 +421,12 @@ for i in range(conf["Npart"]):
     plt.plot(vxi, yi, "o", ms=2)
 
 plt.title("Instantaneous velocity")
-plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
+plt.plot([0, 0], [-0.5 * conf["box_dim"], 0.5 * conf["box_dim"]], "k:")
 plt.plot([-np.max(vx), np.max(vx)], [0, 0], "k:")
 plt.xlabel("x velocity [m/s]")
 plt.ylabel("y position [m]")
 plt.xlim(-np.max(vx), np.max(vx))
-plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.ylim(-0.5 * conf["box_dim"], 0.5 * conf["box_dim"])
 plt.savefig("instantaneous_velocity.png", dpi=400)
 plt.show()
 plt.close()
@@ -432,12 +437,12 @@ for i in range(conf["Npart"]):
     yi = y[i :: conf["Npart"]]
     plt.plot(xi, yi, "o", ms=2)
 
-plt.plot([0, 0], [-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"]], "k:")
-plt.plot([-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"]], [0, 0], "k:")
+plt.plot([0, 0], [-0.5 * conf["box_dim"], 0.5 * conf["box_dim"]], "k:")
+plt.plot([-0.5 * conf["box_dim"], 0.5 * conf["box_dim"]], [0, 0], "k:")
 plt.xlabel("x position [m]")
 plt.ylabel("y position [m]")
-plt.xlim(-0.5 * conf["box_size_x"], 0.5 * conf["box_size_x"])
-plt.ylim(-0.5 * conf["box_size_y"], 0.5 * conf["box_size_y"])
+plt.xlim(-0.5 * conf["box_dim"], 0.5 * conf["box_dim"])
+plt.ylim(-0.5 * conf["box_dim"], 0.5 * conf["box_dim"])
 plt.savefig("trajectory.png", dpi=400)
 plt.show()
 plt.close()
@@ -484,13 +489,13 @@ plt.plot(steps, dyi, "r-", label="y [particle 0]")
 plt.plot([steps[0], steps[-1]], [0, 0], "k:", lw=1)
 plt.plot(
     [steps[0], steps[-1]],
-    [conf["box_size_x"], conf["box_size_x"]],
+    [conf["box_dim"], conf["box_dim"]],
     "k:",
     lw=1,
 )
 plt.plot(
     [steps[0], steps[-1]],
-    [-conf["box_size_x"], -conf["box_size_x"]],
+    [-conf["box_dim"], -conf["box_dim"]],
     "k:",
     lw=1,
 )
@@ -518,13 +523,13 @@ plt.plot(steps, dyi, "r-", label="y [particle 0]")
 plt.plot([steps[0], steps[-1]], [0, 0], "k:", lw=1)
 plt.plot(
     [steps[0], steps[-1]],
-    [conf["box_size_x"], conf["box_size_x"]],
+    [conf["box_dim"], conf["box_dim"]],
     "k:",
     lw=1,
 )
 plt.plot(
     [steps[0], steps[-1]],
-    [-conf["box_size_x"], -conf["box_size_x"]],
+    [-conf["box_dim"], -conf["box_dim"]],
     "k:",
     lw=1,
 )

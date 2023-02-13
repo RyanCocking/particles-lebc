@@ -1,15 +1,15 @@
 traj_file: "traj.csv"
 save_video: False
 draw_all: True
-Nsteps: 500
+Nsteps: 2000
 fps: 20
-Npart: 50
-shear_rate:  2e7   # artery [s^-1]
+Npart: 5
+shear_rate:  2e7   # [s^-1]
 dt: 2.0e-10         # [s]
 
 enable_noise: False
 KT: 4.1418e-21      # [m^2 kg s^-2]
 eta: 1.0e-3      # viscosity of water [Pa]
-part_radius: 1.0e-9   # [m]
+part_radius: 1.0e-9   # [m], box width is 50 * radius
 
 test_mode: True  # applies upward force
