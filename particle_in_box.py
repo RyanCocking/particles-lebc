@@ -114,20 +114,19 @@ class ParticleBox:
 
         if point_within_rectangle(xy, self.bounds):
             return self.image_matrix[-1]
-        else:
-            ind = np.zeros(self.ghost_bounds.size, dtype=bool)
-            for i, gb in enumerate(self.ghost_bounds):
-                ind[i] = point_within_rectangle(xy, gb)
+        ind = np.zeros(self.ghost_bounds.size, dtype=bool)
+        for i, gb in enumerate(self.ghost_bounds):
+            ind[i] = point_within_rectangle(xy, gb)
 
-            if sum(ind) > 1:
-                print(self.image_matrix[np.where(ind)])
-                raise Exception("Particle occupied two images simultaneously")
-            elif sum(ind) == 0:
-                return None
+        if sum(ind) > 1:
+            print(self.image_matrix[np.where(ind)])
+            raise Exception("Particle occupied two images simultaneously")
+        elif sum(ind) == 0:
+            return None
 
-            i = ind.nonzero()[0][0]
-            print(f"Particle entered bounds of image {self.image_matrix[i]}")
-            return self.image_matrix[i]
+        i = ind.nonzero()[0][0]
+        print(f"Particle entered bounds of image {self.image_matrix[i]}")
+        return self.image_matrix[i]
 
     def update_image_particles(self):
         self.ghost_pos = np.repeat(self.state[np.newaxis, :, :2], 8, axis=0)
@@ -297,11 +296,7 @@ ax = fig.add_subplot(
 # images of the periodic copies
 (images,) = ax.plot([], [], "co", ms=6)
 
-if conf["draw_all"]:
-    ind = list(range(8))
-else:
-    ind = [1, 5]
-
+ind = list(range(8)) if conf["draw_all"] else [1, 5]
 rect = plt.Rectangle(
     box.bounds[::2],
     box.dim,
