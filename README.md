@@ -1,7 +1,7 @@
 Lees-Edwards boundary conditions
 ---
 
-A toy model of some particles in a cell experiencing shear force.
+A toy model of some particles in a cell experiencing shear force. Builds upon an elastic particle model written by [Jake Vanderplas](https://github.com/jakevdp).
 
 I wrote this during my PhD to learn and better visualise Lees-Edwards boundary conditions.
 
