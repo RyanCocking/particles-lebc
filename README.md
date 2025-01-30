@@ -6,7 +6,7 @@ A toy model of some particles in a cell experiencing shear force. Builds upon an
 I wrote this during my PhD to learn and better visualise Lees-Edwards boundary conditions.
 
 <p align="center">
-  <img src=https://github.com/user-attachments/assets/5c610243-70a7-4d4c-8183-bc41cd069568 alt="animated" />
+  <img src=https://github.com/user-attachments/assets/12281599-029a-4987-8217-f534f6476788 alt="LEBC" />
 </p>
 
 Further reading:
